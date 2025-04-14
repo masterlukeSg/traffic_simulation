@@ -2,37 +2,15 @@ import pygame
 from random import randint
 from enum import Enum
 
+
+BLACK = ( 0, 0, 0)
+WHITE = ( 255, 255, 255)
+
 class ColorPhase(Enum):
     RED = ( 255, 0, 0)
     YELLOW = ( 238, 210, 2)
     GREEN = ( 0, 128, 0)
     
-
-BLACK = ( 0, 0, 0)
-WHITE = ( 255, 255, 255)
-
-
-pygame.init()
-pygame.display.set_caption("Traffic simulation")
-
-SCREEN_WIDTH = 1200
-SCREEN_HEIGHT = 1200
-
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-clock = pygame.time.Clock()
-
-
-car_positions: list[list[int, int]] = [[60,120], [300,160]]
-car_radius: int = 5
-  
-
-# Countdown
-countdown_start: int = randint(0,10)
-start_ticks = pygame.time.get_ticks()  # save starttime
-# For speed
-prev_time = pygame.time.get_ticks()
-
-active_game: bool = True
 
 class Car:
     def __init__(self, screen, position, color=BLACK):
@@ -52,9 +30,40 @@ class Car:
         return self.position
    
    
-
-
-
+class TrafficLight:
+    def __init__(self, screen, x, y, color=ColorPhase.RED):
+        self.screen = screen
+        self.width = 10
+        self.heihgt = 10
+        self.x = x
+        self.y = y
+        self.color_phase = color
+        
+        self.countdown_start: int = randint(0,10)
+        self.start_ticks = pygame.time.get_ticks()
+        
+    def draw(self):
+        self.update_phase()
+        pygame.draw.rect(self.screen, self.color_phase.value, pygame.Rect(self.x, self.y, self.width, self.heihgt))
+    
+    def update_phase(self):
+        # Calculate how many full seconds have passed since the game started
+        self.seconds_passed = (pygame.time.get_ticks() - self.start_ticks) // 1000
+        # Calculate how much time is left before the countdown ends (traffic light turns green)
+        self.time_left = max(0, self.countdown_start - self.seconds_passed)
+        
+        if self.time_left == 2:
+            self.color_phase = ColorPhase.YELLOW
+        
+        elif self.time_left == 0:
+            self.color_phase = ColorPhase.GREEN
+            
+        else: 
+            self.color_phase = ColorPhase.RED
+        
+    def get_phase(self):
+        return self.color_phase.name
+        
 
 def draw_road(screen) -> None:
     road_width = 80
@@ -92,28 +101,7 @@ def draw_road(screen) -> None:
     # Innerroad : Vertical
     pygame.draw.rect(screen, WHITE, pygame.Rect(ver_start_x + road_height, hor_end_y, 70, street_width))
      
-def move_car(cars_index) -> None:
-    global delta_time
-    
-    speed_per_second = 60
-    
-    for index in cars_index:
-        car_positions[index][0] += speed_per_second * delta_time
-
-def get_car_position() -> list[int]:
-    x_values = []
-    
-    for i in range(len(car_positions)):
-        x_values.append(car_positions[i][0])
-
-    return x_values
-
-def create_traffic_light() -> pygame.Rect:
-    # x,y width, height
-    traffic_light = pygame.Rect(460, 100, 10, 10)
-    return traffic_light
-
-def moving_logic(time_left, traffic_light ) -> None:
+def moving_logic(time_left, traffic_light) -> None:
     if time_left > 0:
         pygame.draw.rect(screen, RED, traffic_light)
     
@@ -135,7 +123,27 @@ def update_time(prev_time) -> tuple[int, float]:
     current = pygame.time.get_ticks()
     delta = (current - prev_time) / 1000.0  # Consistent car movement regardless of frame rate
     return delta, current
+    
 
+
+
+pygame.init()
+pygame.display.set_caption("Traffic simulation")
+
+SCREEN_WIDTH = 1200
+SCREEN_HEIGHT = 1200
+
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+clock = pygame.time.Clock()
+
+prev_time = pygame.time.get_ticks()
+
+active_game: bool = True
+
+
+
+cars: Car = [Car(screen, [60,120]), Car(screen, [300,160])]
+traffic_light = TrafficLight(screen, 460, 100)
 
 
 while active_game:
@@ -145,24 +153,18 @@ while active_game:
         if event.type == pygame.QUIT:
             active_game = False
             pygame.quit()
-            
-    # Calculate how many full seconds have passed since the game started
-    seconds_passed = (pygame.time.get_ticks() - start_ticks) // 1000
-    # Calculate how much time is left before the countdown ends (traffic light turns green)
-    time_left = max(0, countdown_start - seconds_passed) 
-    
-    
-    delta_time, prev_time = update_time(prev_time)
-    
-    
+
     # Background color
-    screen.fill(GREEN)
+    screen.fill(ColorPhase.GREEN.value)
+
+    delta_time, prev_time = update_time(prev_time)    
     
     draw_road(screen)
-    draw_car(screen)
-    traffic_light = create_traffic_light()
-    moving_logic(time_left, traffic_light)
- 
+    traffic_light.draw()
+    
+    for car in cars:
+        car.draw()
+        car.move(delta_time)
     
     # Refresh window
     pygame.display.flip()
