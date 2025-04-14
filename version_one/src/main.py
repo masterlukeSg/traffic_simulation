@@ -1,10 +1,16 @@
 import pygame
 from random import randint
+from enum import Enum
 
-RED = ( 255, 0, 0)
-GREEN = ( 0, 128, 0)
+class ColorPhase(Enum):
+    RED = ( 255, 0, 0)
+    YELLOW = ( 238, 210, 2)
+    GREEN = ( 0, 128, 0)
+    
+
 BLACK = ( 0, 0, 0)
 WHITE = ( 255, 255, 255)
+
 
 pygame.init()
 pygame.display.set_caption("Traffic simulation")
@@ -28,12 +34,27 @@ prev_time = pygame.time.get_ticks()
 
 active_game: bool = True
 
-
-def draw_car(screen) -> None:
-    global car_positions, car_radius
+class Car:
+    def __init__(self, screen, position, color=BLACK):
+        self.radius = 5
+        self.speed = 60
+        self.screen = screen
+        self.position: list[int,int] = position
+        self.color = color
     
-    for position in car_positions:
-        pygame.draw.circle(screen, BLACK, position, car_radius)
+    def draw(self):
+        pygame.draw.circle(self.screen, self.color, self.position, self.radius)
+    
+    def move(self, delta_time):
+        self.position[0] += self.speed * delta_time     
+    
+    def position(self) -> list[int]:
+        return self.position
+   
+   
+
+
+
 
 def draw_road(screen) -> None:
     road_width = 80
