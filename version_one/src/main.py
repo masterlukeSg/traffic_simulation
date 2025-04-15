@@ -1,11 +1,13 @@
 import pygame
 from random import randint
 from enum import Enum
+from abc import ABC, abstractmethod
 
 
 class Color(Enum):
     BLACK = ( 0, 0, 0)
     WHITE = ( 255, 255, 255)
+
 
 class ColorPhase(Enum):
     RED = ( 255, 0, 0)
@@ -66,68 +68,75 @@ class TrafficLight:
         return self.color_phase.name
 
 
+class Road(ABC):
+    def __init__(self, screen, start_x, start_y, lenght, width, lanes_amount=2, lane_width=6):
+        self.screen = screen
+        self.x = start_x
+        self.y = start_y
+        self.length = lenght
+        self.width = width
+        self.lanes_amount = lanes_amount
+        self.lane_width = lane_width
+
+    def create(self) -> None:
+        pass
+    
+    def create_seperator(self) -> None:
+        pass
+
+   
+class HorizontalRaod(Road):
+    def __init__(self, screen, start_x, start_y, lenght, width, lanes_amount=2, lane_width=6):
+        super().__init__(screen, start_x, start_y, lenght, width, lanes_amount, lane_width) 
+        self.lane_middle = self.y + (self.width // 2) # Only works for 2 lanes!
+    
+    def create(self):
+        # Road : Black lane
+        pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.x, self.y, self.length, self.lane_width))
+        pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.x, self.y+self.width, self.length, self.lane_width))
+        
+        # Innerroad : White space
+        pygame.draw.rect(self.screen, Color.WHITE.value, pygame.Rect(self.x, self.y+self.lane_width, self.length, self.width-self.lane_width))
+
+        # Road seperator : Black 
+        self.create_seperator()
+    
+    def create_seperator(self) -> None:
+        # Road separator (middle dashed line)
+        separator_width = 10
+        separator_height = 5
+        separator_gap = 10
+
+        # Middle y-position for the separator
+        for i in range(self.x, self.x + self.length, separator_width + separator_gap):
+            pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(i, self.lane_middle, separator_width, separator_height))
+              
+
 class Game():
-    def __init__(self):
+    def __init__(self) -> None:
         pygame.init()
         pygame.display.set_caption("Traffic simulation")
 
         self.SCREEN_WIDTH = 1200
-        self.SCREEN_HEIGHT = 1200
-
+        self.SCREEN_HEIGHT = 900
         self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
         self.clock = pygame.time.Clock()
-
         self.prev_time = pygame.time.get_ticks()
         self.active_game: bool = True
     
-    def draw_road(self) -> None:
-        road_width = 80
+    def play(self) -> None:
+        self.cars: Car = [Car(self.screen, [60,120]), Car(self.screen, [300,160])]
+        self.traffic_light = TrafficLight(self.screen, 460, 100)
         
-        # horizontal road
-        hor_start_y = 100
-        hor_end_y = hor_start_y + road_width
-        hor_x = 50
-        
-        # vertical road
-        ver_start_x = 640
-        ver_end_x = ver_start_x + road_width
-        
-        road_height = 10
-        street_width = 600
-        
-        # (x, y, width, height)
-        # Road : horizontal 
-        pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(hor_x, hor_start_y, street_width, road_height))
-        pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(hor_x, hor_end_y, street_width, road_height))
-
-        # Innerroad : horizontal
-        pygame.draw.rect(self.screen, Color.WHITE.value, pygame.Rect(hor_x, hor_start_y + road_height, street_width, 70))
-
-        # Road separator : horizontal
-        for i in range(hor_x, street_width+50, 20):
-            pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(i, round((hor_start_y+hor_end_y)/2), 10, 5))      
-        
-        ## TODO: Complete the vertical street
-        
-        # Road : Vertical 
-        pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(ver_start_x, hor_end_y, road_height, street_width))
-        pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(ver_end_x, hor_end_y, road_height, street_width))
-        
-        # Innerroad : Vertical
-        pygame.draw.rect(self.screen, Color.WHITE.value, pygame.Rect(ver_start_x + road_height, hor_end_y, 70, street_width))
+        self.h_road = HorizontalRaod(self.screen, 100, 400, 410, 80)
+        self.game_loop()
     
     def update_time(self, prev_time) -> tuple[int, float]:
         current = pygame.time.get_ticks()
         delta = (current - prev_time) / 1000.0  # Consistent car movement regardless of frame rate
         return delta, current
     
-    def play(self):
-        self.cars: Car = [Car(self.screen, [60,120]), Car(self.screen, [300,160])]
-        self.traffic_light = TrafficLight(self.screen, 460, 100)
-        
-        self.game_loop()
-
-    def game_loop(self):
+    def game_loop(self) -> None:
         while self.active_game:
             self.clock.tick(60)
 
@@ -140,15 +149,17 @@ class Game():
             self.screen.fill(ColorPhase.GREEN.value)
 
             self.delta_time, self.prev_time = self.update_time(self.prev_time)    
-            self.draw_road()
-            self.traffic_light.draw()
             
-            for car in self.cars:
+            self.h_road.create() # create road
+            self.traffic_light.draw() # create traffic light
+            
+            for car in self.cars: # create all cars
                 car.draw()
                 car.move(self.delta_time)
             
             # Refresh window
             pygame.display.flip()
+
 
 
 def moving_logic(time_left, traffic_light) -> None:
@@ -168,7 +179,6 @@ def moving_logic(time_left, traffic_light) -> None:
     elif time_left == 0:
         pygame.draw.rect(screen, GREEN, traffic_light)
         move_car(list(range(0, len(car_positions))))
-
 
 
 
