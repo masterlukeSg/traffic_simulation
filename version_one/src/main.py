@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 class Color(Enum):
     BLACK = ( 0, 0, 0)
     WHITE = ( 255, 255, 255)
+    GRAY = ( 128, 128, 128)
 
 
 class ColorPhase(Enum):
@@ -23,10 +24,10 @@ class Car:
         self.position: list[int,int] = position
         self.color = color.value
     
-    def draw(self):
+    def draw(self) -> None:
         pygame.draw.circle(self.screen, self.color, self.position, self.radius)
     
-    def move(self, delta_time):
+    def move(self, delta_time) -> None:
         self.position[0] += self.speed * delta_time     
     
     def position(self) -> list[int]:
@@ -41,33 +42,82 @@ class TrafficLight:
         self.x = x
         self.y = y
         self.color_phase = color
-        
-        self.countdown_start: int = randint(0,10)
+        self.starting_color_phase = color
+
+        # how long a phase should take (in seconds)
+        self.green_red_phase = 8
+        self.yellow_phase = 2
+              
+        self.countdown_start: int = self.green_red_phase
         self.start_ticks = pygame.time.get_ticks()
-        
-    def draw(self):
+        self.time_left = self.countdown_start
+            
+    def draw(self) -> None:
         self.update_phase()
         pygame.draw.rect(self.screen, self.color_phase.value, pygame.Rect(self.x, self.y, self.width, self.heihgt))
     
-    def update_phase(self):
+    def update_phase(self) -> None:
         # Calculate how many full seconds have passed since the game started
         self.seconds_passed = (pygame.time.get_ticks() - self.start_ticks) // 1000
         # Calculate how much time is left before the countdown ends (traffic light turns green)
         self.time_left = max(0, self.countdown_start - self.seconds_passed)
         
-        if self.time_left == 2 or self.time_left == 1 :
-            self.color_phase = ColorPhase.YELLOW
-        
+        # when 2 and 1 seconds are left: Yellow 
+        if self.time_left <= self.yellow_phase and self.time_left != 0:
+            if self.starting_color_phase == ColorPhase.RED:
+                self.color_phase = ColorPhase.YELLOW
+                
+            elif self.starting_color_phase == ColorPhase.GREEN:
+                self.color_phase = ColorPhase.YELLOW
+
+        # when 0 seconds are letf, change the starting_color to red or green
         elif self.time_left == 0:
-            self.color_phase = ColorPhase.GREEN
+            if self.starting_color_phase == ColorPhase.RED:
+                self.color_phase = ColorPhase.GREEN
+                self.starting_color_phase = ColorPhase.GREEN
+                
+            elif self.starting_color_phase == ColorPhase.GREEN:
+                self.color_phase = ColorPhase.RED
+                self.starting_color_phase = ColorPhase.RED
             
-        else: 
-            self.color_phase = ColorPhase.RED
-        
-    def get_phase(self):
+            # restart the countdown for the timer
+            self.countdown_start: int = self.green_red_phase
+            self.start_ticks = pygame.time.get_ticks()
+            
+    def get_phase(self) -> str:
         return self.color_phase.name
 
+    def get_starting_phase(self) -> str:
+        return self.starting_color_phase.name
 
+    def get_next_phase(self) -> str:  
+        red = ColorPhase.RED.name
+        yellow = ColorPhase.YELLOW.name
+        green = ColorPhase.GREEN.name
+        
+        phase = self.get_phase()
+        start = self.get_starting_phase() 
+        
+        transition = {
+            red : {red: yellow , yellow: green},
+            green : {green: yellow, yellow: red},
+        }
+        
+        # first dict and then go into second dict
+        return transition.get(start, {}).get(phase, {})
+    
+    def seconds_till_next_phase(self) -> int:
+        red = ColorPhase.RED.name
+        green = ColorPhase.GREEN.name
+        
+        phase = self.get_phase()
+
+        if phase == red or phase == green:
+            return int(self.time_left - self.yellow_phase)
+        else:        
+            return int(self.time_left)
+        
+    
 class Road(ABC):
     def __init__(self, screen, start_x, start_y, lenght, width, lanes_amount=2, lane_width=6):
         self.screen = screen
@@ -123,12 +173,13 @@ class Game():
         self.clock = pygame.time.Clock()
         self.prev_time = pygame.time.get_ticks()
         self.active_game: bool = True
+        self.my_font = pygame.font.SysFont('Freeroad', 30) # for text
     
     def play(self) -> None:
         self.cars: Car = [Car(self.screen, [60,120]), Car(self.screen, [300,160])]
         self.traffic_light = TrafficLight(self.screen, 460, 100)
-        
         self.h_road = HorizontalRaod(self.screen, 100, 400, 410, 80)
+        
         self.game_loop()
     
     def update_time(self, prev_time) -> tuple[int, float]:
@@ -136,6 +187,14 @@ class Game():
         delta = (current - prev_time) / 1000.0  # Consistent car movement regardless of frame rate
         return delta, current
     
+    def time_left_text(self) -> None:
+        # Text
+        time_left = str(self.traffic_light.seconds_till_next_phase())
+        next_pahse = self.traffic_light.get_next_phase().title()
+        combined = f'In {time_left} seconds the traffic light will change to {next_pahse}'
+        self.text1 = self.my_font.render(combined, True, Color.BLACK.value)
+        self.screen.blit(self.text1,(10, 10))
+            
     def game_loop(self) -> None:
         while self.active_game:
             self.clock.tick(60)
@@ -146,16 +205,21 @@ class Game():
                     pygame.quit()
 
             # Background color
-            self.screen.fill(ColorPhase.GREEN.value)
-
+            self.screen.fill(Color.GRAY.value)
+            
+            # Update time 
             self.delta_time, self.prev_time = self.update_time(self.prev_time)    
             
+            # Draw objetcs
             self.h_road.create() # create road
             self.traffic_light.draw() # create traffic light
             
             for car in self.cars: # create all cars
                 car.draw()
                 car.move(self.delta_time)
+            
+            # Write how many seconds are left till the traffic light changes
+            self.time_left_text()
             
             # Refresh window
             pygame.display.flip()
