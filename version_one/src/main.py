@@ -5,6 +5,8 @@ from enum import Enum
 from abc import ABC
 import uuid
 
+LANE_WIDTH = 5
+
 
 class Color(Enum):
     BLACK = ( 0, 0, 0)
@@ -187,14 +189,14 @@ class Car:
         
 
 class Road(ABC):
-    def __init__(self, screen, start_x, start_y, lenght, width, directions: list[RoadDirections], lanes_amount=2, lane_width=6):
+    def __init__(self, screen, start_x, start_y, lenght, width, directions: list[RoadDirections], lanes_amount=2):
         self.screen = screen
         self.x: float = start_x
         self.y: float = start_y
         self.length: int = lenght
         self.width: int = width
         self.lanes_amount: int = lanes_amount
-        self.lane_width: int = lane_width
+        self.lane_width: int = LANE_WIDTH
         self.directions: list[RoadDirections] = directions
 
     def draw(self) -> None:
@@ -208,8 +210,8 @@ class Road(ABC):
   
  
 class HorizontalRaod(Road):
-    def __init__(self, screen, start_x, start_y, lenght, width, directions, lanes_amount=2, lane_width=5):
-        super().__init__(screen, start_x, start_y, lenght, width, directions, lanes_amount, lane_width) 
+    def __init__(self, screen, start_x, start_y, lenght, width, directions, lanes_amount=2):
+        super().__init__(screen, start_x, start_y, lenght, width, directions, lanes_amount) 
         self.lane_middle = self.y + (self.width // 2) # Only works for 2 lanes!
     
     def get_directions(self) -> list[RoadDirections]:
@@ -238,8 +240,8 @@ class HorizontalRaod(Road):
 
 
 class VerticalRoad(Road):
-    def __init__(self, screen, start_x, start_y, lenght, width, directions, lanes_amount=2, lane_width=5):
-        super().__init__(screen, start_x, start_y, lenght, width, directions, lanes_amount, lane_width)
+    def __init__(self, screen, start_x, start_y, lenght, width, directions, lanes_amount=2):
+        super().__init__(screen, start_x, start_y, lenght, width, directions, lanes_amount)
         self.lane_middle = self.x + (self.width // 2) # Only works for 2 lanes!
         
     def get_directions(self) -> list[RoadDirections]:
@@ -274,26 +276,48 @@ class Intersection():
         self.y: int = start_y
         self.side_length: int = side_length
         self.directions: list[RoadDirections] = directions
-        self.lane_width = 5
+        self.lane_width = LANE_WIDTH
     
-    def draw(self):
+    def draw(self) -> None:
         pygame.draw.rect(self.screen, Color.WHITE.value, pygame.Rect(self.x, self.y, self.side_length-self.lane_width, self.side_length-self.lane_width))
         self.create_boundries()
-        
-    def create_boundries(self):
-        ## for all the road directions that are in the self.directions there should a pixel be added in the corner
+    
+    def draw_corner_pixel(self, x, y, w, h):
+        pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(x, y, w, h))
+    
+    def create_boundries(self) -> None:
+        lane = self.lane_width
+        size = self.side_length
+        max_x = self.x + size - lane
+        max_y = self.y + size - lane
+        corner_size = LANE_WIDTH
+
+
+        # Side boundaries
         if RoadDirections.EAST not in self.directions:
-            pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.x+self.side_length-self.lane_width, self.y,self.lane_width, self.side_length-self.lane_width))
-        
+            self.draw_corner_pixel(max_x, self.y, lane, size - lane)
+
         if RoadDirections.WEST not in self.directions:
-            pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.x, self.y,self.lane_width, self.side_length-self.lane_width))
+            self.draw_corner_pixel(self.x, self.y, lane, size - lane)
 
         if RoadDirections.NORTH not in self.directions:
-            pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.x, self.y-self.lane_width, self.side_length-self.lane_width, self.lane_width))
+            self.draw_corner_pixel(self.x, self.y - lane, size - lane, lane)
 
         if RoadDirections.SOUTH not in self.directions:
-            pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.x, self.y-self.lane_width + self.side_length, self.side_length-self.lane_width, self.lane_width))
+            self.draw_corner_pixel(self.x, self.y - lane + size, size - lane, lane)
+
+
+        # Draw corners
+        corners = [
+            (self.x - corner_size, self.y - corner_size),       # Top Left
+            (max_x, self.y - corner_size),                      # Top Right
+            (self.x - corner_size, max_y),                      # Bottom Left
+            (max_x, max_y),                                      # Bottom Right
+        ]
         
+        for cx, cy in corners:
+            self.draw_corner_pixel(cx, cy, corner_size, corner_size)
+            
         
 class Game():
     def __init__(self) -> None:
@@ -317,26 +341,31 @@ class Game():
         self.game_loop()
     
     def generate_map(self) -> None:
-        road_x = 100
+        # starting road is the west_road
+        road_x = 300 
         road_y = 350
-        road_length = 420
+        road_length = 220
         road_width = 80
         
         end_street_x = road_x + road_length
-        end_y = road_y + 5 
+        end_y = road_y + LANE_WIDTH 
         
         intersec_side_lengths = road_width # to compensate the seperators
         
-        first_road_directions = [RoadDirections.WEST, RoadDirections.SOUTH]
+        road_directions = [RoadDirections.WEST, RoadDirections.SOUTH, RoadDirections.NORTH, RoadDirections.EAST]
         
-        self.first_road = HorizontalRaod(self.screen, road_x, road_y, road_length, road_width, first_road_directions)
-        self.intersection = Intersection(self.screen, end_street_x, end_y, intersec_side_lengths, first_road_directions)
         
-        self.traffic_light = TrafficLight(self.screen, end_street_x-10, road_y-10)       
-
+        self.west_road = HorizontalRaod(self.screen, road_x, road_y, road_length, road_width, road_directions)
+        self.west_traffic_light = TrafficLight(self.screen, end_street_x-10, road_y-10)
         
-        self.second_road = VerticalRoad(self.screen, end_street_x-5, road_y+intersec_side_lengths-5, road_length, road_width, first_road_directions)              
+        self.east_road = HorizontalRaod(self.screen, end_street_x+intersec_side_lengths-LANE_WIDTH, road_y, road_length, road_width, road_directions)
         
+        self.south_road = VerticalRoad(self.screen, end_street_x-LANE_WIDTH, road_y+intersec_side_lengths-LANE_WIDTH, road_length, road_width, road_directions)              
+        
+        self.north_road = VerticalRoad(self.screen, end_street_x-LANE_WIDTH, road_y-road_length, road_length, road_width, road_directions)
+        
+        self.intersection = Intersection(self.screen, end_street_x, end_y, intersec_side_lengths, road_directions)
+    
     def spawn_car(self, x: int = 120, y: int = 220) -> None:
         self.cars.append(Car(self.screen, x, y))
 
@@ -352,9 +381,8 @@ class Game():
         return delta, current
     
     def remaining_time_text(self) -> None:
-        # Text
-        time_left = str(self.traffic_light.remaining_time())
-        next_pahse = self.traffic_light.get_next_phase().title()
+        time_left = str(self.west_traffic_light.remaining_time())
+        next_pahse = self.west_traffic_light.get_next_phase().title()
         combined = f'In {time_left} seconds the traffic light will change to {next_pahse}'
         self.text1 = self.my_font.render(combined, True, Color.BLACK.value)
         self.screen.blit(self.text1,(10, 10))
@@ -373,13 +401,15 @@ class Game():
         self.cars.sort(key=lambda car: car.x) # sort the cars after x value
  
         for car in self.cars:
-            car.move(self.delta_time, self.traffic_light, self.cars)
+            car.move(self.delta_time, self.west_traffic_light, self.cars)
 
     def draw(self) -> None:
         self.screen.fill(Color.GRAY.value)
-        self.first_road.draw()
-        self.second_road.draw()
-        self.traffic_light.draw()
+        self.west_road.draw()
+        self.west_traffic_light.draw()
+        self.east_road.draw()
+        self.south_road.draw()
+        self.north_road.draw()
         self.intersection.draw()
         
         for car in self.cars:
