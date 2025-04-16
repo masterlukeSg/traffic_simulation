@@ -1,7 +1,9 @@
+from __future__ import annotations # To type hint car in the car class
 import pygame
 from random import randint
 from enum import Enum
 from abc import ABC
+import uuid
 
 
 class Color(Enum):
@@ -105,32 +107,47 @@ class TrafficLight:
     
 class Car:
     def __init__(self, screen, x, y, color=Color.BLACK):
-        self.radius = 4.5
-        self.safety_distance = self.radius * 2
-        self.speed = 60
         self.screen = screen
+        
+        self.id = uuid.uuid4().hex[:6] # 6 chars for the id 
+        self.radius = 4.5
+        self.safety_distance = self.radius * 5
+        self.speed = 60
+        self.driving = False
         self.color = color.value
+        
         self.x = x
         self.y = y
-        
+      
     def draw(self) -> None:
         pygame.draw.circle(self.screen, self.color, [self.x, self.y], self.radius)
     
-    def move(self, delta_time: int, traffic_light: TrafficLight) -> None:
+    def move(self, delta_time: int, traffic_light: TrafficLight, all_cars: list[Car]) -> None:
         phase = traffic_light.get_phase()
         traffic_light_x= traffic_light.get_location()[0]
         
         car_front = self.x + self.safety_distance
         wait_phases = [ColorPhase.RED.name, ColorPhase.YELLOW.name]
         
-        if self.cars_in_front():
-            if not self.car_in_front_moving():
-                return
-             
-        # The car must wait at the traffic light
-        if traffic_light_x - car_front <= 10 and  traffic_light_x - car_front >= 1 and phase in wait_phases :
-            return
+        cars_in_front = self.get_cars_in_front(all_cars)
+        if cars_in_front: 
+            if not self.car_in_front_moving(cars_in_front):
+                self.driving = False
+                return 
+            
         
+        # Car is near the traffic light
+        if traffic_light_x - car_front <= 10 and traffic_light_x - car_front >= 1:    
+            #if not self.car_in_front_moving(cars_in_front):
+            #    self.driving = False
+            #    return
+                
+            # The car must wait at the traffic light
+            if phase in wait_phases:
+                self.driving = False
+                return
+        
+        self.driving = True
         self.x += self.speed * delta_time
     
     def position(self) -> tuple[int, int]:
@@ -139,17 +156,25 @@ class Car:
     def is_off_screen(self) -> bool:
         return self.x > self.screen.get_width() or self.y > self.screen.get_height()
    
-    def cars_in_front(self) -> bool:
+    def get_driving_status(self) -> bool:
+        return self.driving
+        
+    def get_cars_in_front(self, all_cars: list[Car]) -> list[Car]:
+        all_cars_ids = [car.id for car in all_cars]
+        
+        index = all_cars_ids.index(self.id)
+        cars_in_front_of_me = all_cars[index+1:]
+
+        return cars_in_front_of_me
+
         # TODO: detect if a car is infront of me or am i the first car ?
         # safty distance to the next car in front of me 
-        return False
     
-    def car_in_front_moving(self, car_in_front = None) -> bool:
-        # TODO: check if the car infront is moving or not 
-        # add a status for that (own Car function)
-        return True
-    
-    
+    def car_in_front_moving(self, car_in_front: list[Car]) -> bool:
+        car = car_in_front[0]
+        too_close = abs(car.x - self.x) < self.safety_distance
+        return car.get_driving_status() or not too_close
+        
 
 class Road(ABC):
     def __init__(self, screen, start_x, start_y, lenght, width, lanes_amount=2, lane_width=6):
@@ -209,7 +234,7 @@ class Game():
         self.my_font = pygame.font.SysFont('Freeroad', 20)
 
         self.cars: list[Car] = []
-        self.car_spawn_rate: int = 4 # every ... seconds a car should spawn
+        self.car_spawn_rate: int = 2 # every ... seconds a car should spawn
         self.last_car_spawn_time: int = pygame.time.get_ticks() - self.car_spawn_rate * 1000.
 
     def play(self) -> None:
@@ -250,10 +275,10 @@ class Game():
         self.create_cars()
        
         self.cars = [car for car in self.cars if not car.is_off_screen()] # delete cras, which are not in the screen
-        self.cars.sort(key=lambda car: car.x, reverse=True) # sort the cars after x value
+        self.cars.sort(key=lambda car: car.x) # sort the cars after x value
  
         for car in self.cars:
-            car.move(self.delta_time, self.traffic_light)
+            car.move(self.delta_time, self.traffic_light, self.cars)
 
     def draw(self) -> None:
         self.screen.fill(Color.GRAY.value)
