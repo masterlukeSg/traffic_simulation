@@ -16,28 +16,6 @@ class ColorPhase(Enum):
     GREEN = ( 0, 128, 0)
     
 
-class Car:
-    def __init__(self, screen, x, y, color=Color.BLACK):
-        self.radius = 4.5
-        self.speed = 60
-        self.screen = screen
-        self.color = color.value
-        self.x = x
-        self.y = y
-        
-    def draw(self) -> None:
-        pygame.draw.circle(self.screen, self.color, [self.x, self.y], self.radius)
-    
-    def move(self, delta_time) -> None:
-        self.x += self.speed * delta_time     
-    
-    def position(self) -> tuple[int, int]:
-        return (self.x, self.y)
-   
-    def is_off_screen(self) -> bool:
-        return self.x > self.screen.get_width() or self.y > self.screen.get_height()
-   
-
 class TrafficLight:
     def __init__(self, screen, x, y, color=ColorPhase.RED):
         self.screen = screen
@@ -49,7 +27,7 @@ class TrafficLight:
         self.starting_color_phase = color
 
         # how long a phase should take (in seconds)
-        self.green_red_phase = 8
+        self.green_red_phase = randint (5,9)
         self.yellow_phase = 2
               
         self.countdown_start: int = self.green_red_phase
@@ -123,6 +101,54 @@ class TrafficLight:
     
     def get_location(self) -> tuple[int, int]:
         return (self.x, self.y) 
+
+    
+class Car:
+    def __init__(self, screen, x, y, color=Color.BLACK):
+        self.radius = 4.5
+        self.safety_distance = self.radius * 2
+        self.speed = 60
+        self.screen = screen
+        self.color = color.value
+        self.x = x
+        self.y = y
+        
+    def draw(self) -> None:
+        pygame.draw.circle(self.screen, self.color, [self.x, self.y], self.radius)
+    
+    def move(self, delta_time: int, traffic_light: TrafficLight) -> None:
+        phase = traffic_light.get_phase()
+        traffic_light_x= traffic_light.get_location()[0]
+        
+        car_front = self.x + self.safety_distance
+        wait_phases = [ColorPhase.RED.name, ColorPhase.YELLOW.name]
+        
+        if self.cars_in_front():
+            if not self.car_in_front_moving():
+                return
+             
+        # The car must wait at the traffic light
+        if traffic_light_x - car_front <= 10 and  traffic_light_x - car_front >= 1 and phase in wait_phases :
+            return
+        
+        self.x += self.speed * delta_time
+    
+    def position(self) -> tuple[int, int]:
+        return (self.x, self.y)
+   
+    def is_off_screen(self) -> bool:
+        return self.x > self.screen.get_width() or self.y > self.screen.get_height()
+   
+    def cars_in_front(self) -> bool:
+        # TODO: detect if a car is infront of me or am i the first car ?
+        # safty distance to the next car in front of me 
+        return False
+    
+    def car_in_front_moving(self, car_in_front = None) -> bool:
+        # TODO: check if the car infront is moving or not 
+        # add a status for that (own Car function)
+        return True
+    
     
 
 class Road(ABC):
@@ -189,7 +215,6 @@ class Game():
     def play(self) -> None:
         self.traffic_light = TrafficLight(self.screen, 500, 390)
         self.h_road = HorizontalRaod(self.screen, 100, 400, 410, 80)
-        
         self.game_loop()
     
     def spawn_car(self, x: int = 120, y: int = 420) -> None:
@@ -223,12 +248,12 @@ class Game():
     def update(self) -> None:
         self.delta_time, self.prev_time = self.update_time(self.prev_time)
         self.create_cars()
-        self.cars = [car for car in self.cars if not car.is_off_screen()]
-        print(len(self.cars))
-
-        
+       
+        self.cars = [car for car in self.cars if not car.is_off_screen()] # delete cras, which are not in the screen
+        self.cars.sort(key=lambda car: car.x, reverse=True) # sort the cars after x value
+ 
         for car in self.cars:
-            car.move(self.delta_time)
+            car.move(self.delta_time, self.traffic_light)
 
     def draw(self) -> None:
         self.screen.fill(Color.GRAY.value)
@@ -247,28 +272,6 @@ class Game():
             self.handle_events()
             self.update()
             self.draw()
-
-
-
-
-def moving_logic(time_left, traffic_light) -> None:
-    if time_left > 0:
-        pygame.draw.rect(screen, RED, traffic_light)
-    
-        to_move = []
-        car_pos = get_car_position()
-
-        for index in range(len(car_pos)):
-            # If car is 10 pixel infront of the traffic light, stop the car
-            if car_pos[index] <= traffic_light.x - 10:
-                to_move.append(index)
-        
-        move_car(to_move)
-        
-    elif time_left == 0:
-        pygame.draw.rect(screen, GREEN, traffic_light)
-        move_car(list(range(0, len(car_positions))))
-
 
 
 if __name__ == "__main__":
