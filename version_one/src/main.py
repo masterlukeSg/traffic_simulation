@@ -237,6 +237,64 @@ class HorizontalRaod(Road):
             pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(i, self.lane_middle, separator_width, separator_height))
 
 
+class VerticalRoad(Road):
+    def __init__(self, screen, start_x, start_y, lenght, width, directions, lanes_amount=2, lane_width=5):
+        super().__init__(screen, start_x, start_y, lenght, width, directions, lanes_amount, lane_width)
+        self.lane_middle = self.x + (self.width // 2) # Only works for 2 lanes!
+        
+    def get_directions(self) -> list[RoadDirections]:
+        return super().get_directions()          
+
+    def draw(self) -> None:
+        # Road : Black lane
+        pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.x, self.y+self.lane_width, self.lane_width, self.length))
+        pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.x+self.width, self.y+self.lane_width, self.lane_width, self.length))
+        
+        # Innerroad : White space
+        pygame.draw.rect(self.screen, Color.WHITE.value, pygame.Rect(self.x+self.lane_width, self.y+self.lane_width, self.width-self.lane_width, self.length))
+
+        # Road seperator : Black 
+        self.create_seperator()        
+
+    def create_seperator(self) -> None:
+        # Road separator (middle dashed line)
+        separator_width = 10
+        separator_height = 5
+        separator_gap = 10
+
+        # Middle y-position for the separator
+        for i in range(self.y+self.lane_width, self.y + self.length, separator_width + separator_gap):
+            pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.lane_middle, i,  separator_height, separator_width))
+        
+    
+class Intersection():
+    def __init__(self, screen, start_x, start_y, side_length, directions):
+        self.screen = screen
+        self.x: int = start_x
+        self.y: int = start_y
+        self.side_length: int = side_length
+        self.directions: list[RoadDirections] = directions
+        self.lane_width = 5
+    
+    def draw(self):
+        pygame.draw.rect(self.screen, Color.WHITE.value, pygame.Rect(self.x, self.y, self.side_length-self.lane_width, self.side_length-self.lane_width))
+        self.create_boundries()
+        
+    def create_boundries(self):
+        ## for all the road directions that are in the self.directions there should a pixel be added in the corner
+        if RoadDirections.EAST not in self.directions:
+            pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.x+self.side_length-self.lane_width, self.y,self.lane_width, self.side_length-self.lane_width))
+        
+        if RoadDirections.WEST not in self.directions:
+            pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.x, self.y,self.lane_width, self.side_length-self.lane_width))
+
+        if RoadDirections.NORTH not in self.directions:
+            pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.x, self.y-self.lane_width, self.side_length-self.lane_width, self.lane_width))
+
+        if RoadDirections.SOUTH not in self.directions:
+            pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.x, self.y-self.lane_width + self.side_length, self.side_length-self.lane_width, self.lane_width))
+        
+        
 class Game():
     def __init__(self) -> None:
         pygame.init()
@@ -255,11 +313,31 @@ class Game():
         self.last_car_spawn_time: int = pygame.time.get_ticks() - self.car_spawn_rate * 1000.
 
     def play(self) -> None:
-        self.traffic_light = TrafficLight(self.screen, 500, 390)
-        self.h_road = HorizontalRaod(self.screen, 100, 400, 410, 80)
+        self.generate_map()
         self.game_loop()
     
-    def spawn_car(self, x: int = 120, y: int = 420) -> None:
+    def generate_map(self) -> None:
+        road_x = 100
+        road_y = 350
+        road_length = 420
+        road_width = 80
+        
+        end_street_x = road_x + road_length
+        end_y = road_y + 5 
+        
+        intersec_side_lengths = road_width # to compensate the seperators
+        
+        first_road_directions = [RoadDirections.WEST, RoadDirections.SOUTH]
+        
+        self.first_road = HorizontalRaod(self.screen, road_x, road_y, road_length, road_width, first_road_directions)
+        self.intersection = Intersection(self.screen, end_street_x, end_y, intersec_side_lengths, first_road_directions)
+        
+        self.traffic_light = TrafficLight(self.screen, end_street_x-10, road_y-10)       
+
+        
+        self.second_road = VerticalRoad(self.screen, end_street_x-5, road_y+intersec_side_lengths-5, road_length, road_width, first_road_directions)              
+        
+    def spawn_car(self, x: int = 120, y: int = 220) -> None:
         self.cars.append(Car(self.screen, x, y))
 
     def create_cars(self) -> None:
@@ -299,8 +377,10 @@ class Game():
 
     def draw(self) -> None:
         self.screen.fill(Color.GRAY.value)
-        self.h_road.create()
+        self.first_road.draw()
+        self.second_road.draw()
         self.traffic_light.draw()
+        self.intersection.draw()
         
         for car in self.cars:
             car.draw()
