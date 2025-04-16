@@ -16,7 +16,14 @@ class ColorPhase(Enum):
     RED = ( 255, 0, 0)
     YELLOW = ( 238, 210, 2)
     GREEN = ( 0, 128, 0)
-    
+
+
+class RoadDirections(Enum):
+    NORTH = "up"
+    EAST = "right"
+    SOUTH = "down"
+    WEST = "left"
+
 
 class TrafficLight:
     def __init__(self, screen, x, y, color=ColorPhase.RED):
@@ -123,33 +130,36 @@ class Car:
         pygame.draw.circle(self.screen, self.color, [self.x, self.y], self.radius)
     
     def move(self, delta_time: int, traffic_light: TrafficLight, all_cars: list[Car]) -> None:
+        if self.should_move(traffic_light, all_cars):
+            self.apply_move(delta_time)
+            self.driving = True
+            
+        else:
+            self.driving = False
+            
+    def should_move(self, traffic_light: TrafficLight, all_cars: list[Car]) -> bool:
         phase = traffic_light.get_phase()
         traffic_light_x= traffic_light.get_location()[0]
         
         car_front = self.x + self.safety_distance
         wait_phases = [ColorPhase.RED.name, ColorPhase.YELLOW.name]
-        
+
         cars_in_front = self.get_cars_in_front(all_cars)
+        
         if cars_in_front: 
             if not self.car_in_front_moving(cars_in_front):
-                self.driving = False
-                return 
+                return False
             
-        
-        # Car is near the traffic light
-        if traffic_light_x - car_front <= 10 and traffic_light_x - car_front >= 1:    
-            #if not self.car_in_front_moving(cars_in_front):
-            #    self.driving = False
-            #    return
-                
-            # The car must wait at the traffic light
-            if phase in wait_phases:
-                self.driving = False
-                return
-        
+        # Car is near the traffic light & must wait as it is yellow or red
+        if traffic_light_x - car_front <= 10 and traffic_light_x - car_front >= 1 and phase in wait_phases:    
+            return False
+
+        return True
+    
+    def apply_move(self, delta_time: int) -> None:
         self.driving = True
         self.x += self.speed * delta_time
-    
+
     def position(self) -> tuple[int, int]:
         return (self.x, self.y)
    
@@ -177,28 +187,35 @@ class Car:
         
 
 class Road(ABC):
-    def __init__(self, screen, start_x, start_y, lenght, width, lanes_amount=2, lane_width=6):
+    def __init__(self, screen, start_x, start_y, lenght, width, directions: list[RoadDirections], lanes_amount=2, lane_width=6):
         self.screen = screen
-        self.x = start_x
-        self.y = start_y
-        self.length = lenght
-        self.width = width
-        self.lanes_amount = lanes_amount
-        self.lane_width = lane_width
+        self.x: float = start_x
+        self.y: float = start_y
+        self.length: int = lenght
+        self.width: int = width
+        self.lanes_amount: int = lanes_amount
+        self.lane_width: int = lane_width
+        self.directions: list[RoadDirections] = directions
 
-    def create(self) -> None:
+    def draw(self) -> None:
         pass
     
     def create_seperator(self) -> None:
         pass
 
-   
+    def get_directions(self) -> list[RoadDirections]:
+        return self.directions
+  
+ 
 class HorizontalRaod(Road):
-    def __init__(self, screen, start_x, start_y, lenght, width, lanes_amount=2, lane_width=6):
-        super().__init__(screen, start_x, start_y, lenght, width, lanes_amount, lane_width) 
+    def __init__(self, screen, start_x, start_y, lenght, width, directions, lanes_amount=2, lane_width=5):
+        super().__init__(screen, start_x, start_y, lenght, width, directions, lanes_amount, lane_width) 
         self.lane_middle = self.y + (self.width // 2) # Only works for 2 lanes!
     
-    def create(self):
+    def get_directions(self) -> list[RoadDirections]:
+        return super().get_directions()
+    
+    def draw(self) -> None:
         # Road : Black lane
         pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.x, self.y, self.length, self.lane_width))
         pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.x, self.y+self.width, self.length, self.lane_width))
@@ -218,7 +235,7 @@ class HorizontalRaod(Road):
         # Middle y-position for the separator
         for i in range(self.x, self.x + self.length, separator_width + separator_gap):
             pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(i, self.lane_middle, separator_width, separator_height))
-              
+
 
 class Game():
     def __init__(self) -> None:
