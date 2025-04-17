@@ -1,7 +1,7 @@
 from __future__ import annotations # To type hint car in the car class
 import pygame
 import uuid
-from constants import Color, ColorPhase, RoadDirections
+from constants import Color, ColorPhase, RoadDirections, RoadType
 from map import Road, HorizontalRaod, VerticalRoad, TrafficLight, Intersection, LANE_WIDTH
 
 
@@ -50,19 +50,22 @@ class Car:
 
         return True
     
-    def apply_move(self, delta_time: int, next_direction: RoadDirections=RoadDirections.EAST) -> None:
+    def apply_move(self, delta_time: int) -> None:
         self.driving = True
-        self.x += self.speed * delta_time
+        
+        # TODO: check which road he drives and then how he should drive
+        if self.x:
+            self.y += self.speed * delta_time
+        else:
+            self.x += self.speed * delta_time
 
+    # TODO: check if we need it
     def position(self) -> tuple[int, int]:
         return (self.x, self.y)
    
     def is_off_screen(self) -> bool:
         return self.x > self.screen.get_width() or self.y > self.screen.get_height()
-   
-    def get_driving_status(self) -> bool:
-        return self.driving
-        
+
     def get_cars_in_front(self, all_cars: list[Car]) -> list[Car]:
         all_cars_ids = [car.id for car in all_cars]
         
@@ -74,8 +77,12 @@ class Car:
     def car_in_front_moving(self, car_in_front: list[Car]) -> bool:
         car = car_in_front[0]
         too_close = abs(car.x - self.x) < self.safety_distance
-        return car.get_driving_status() or not too_close
-            
+        return car.driving_status or not too_close
+       
+    @property
+    def driving_status(self) -> bool:
+        return self.driving
+              
         
 class Game():
     def __init__(self) -> None:
@@ -113,18 +120,38 @@ class Game():
         
         road_directions = [RoadDirections.WEST, RoadDirections.SOUTH, RoadDirections.NORTH, RoadDirections.EAST]
         
-        
-        self.west_road = HorizontalRaod(self.screen, road_x, road_y, road_length, road_width, road_directions)
         self.west_traffic_light = TrafficLight(self.screen, end_street_x-15, road_y-10)
         
-        self.east_road = HorizontalRaod(self.screen, end_street_x+intersec_side_lengths-LANE_WIDTH, road_y, road_length, road_width, road_directions)
-        
-        self.south_road = VerticalRoad(self.screen, end_street_x-LANE_WIDTH, road_y+intersec_side_lengths-LANE_WIDTH, road_length, road_width, road_directions)              
-        
-        self.north_road = VerticalRoad(self.screen, end_street_x-LANE_WIDTH, road_y-road_length, road_length, road_width, road_directions)
-        
-        self.intersection = Intersection(self.screen, end_street_x, end_y, intersec_side_lengths, road_directions)
+        self.create_road(road_x, road_y, road_length, road_width, road_directions, RoadType.HORIZONTAL)
+        self.create_road(end_street_x+intersec_side_lengths-LANE_WIDTH, road_y, road_length, road_width, road_directions, RoadType.HORIZONTAL)
+        self.create_road(end_street_x-LANE_WIDTH, road_y+intersec_side_lengths-LANE_WIDTH, road_length, road_width, road_directions, RoadType.VERTICAL)
+        self.create_road(end_street_x-LANE_WIDTH, road_y-road_length, road_length, road_width, road_directions, RoadType.VERTICAL)
+        self.create_road(end_street_x, end_y, intersec_side_lengths, intersec_side_lengths, road_directions, RoadType.INTERSECTION)
+
+    def spawn_road(self, road: Road) -> None:
+        self.roads.append(road)
     
+    def create_road(self, x:float, y:float, width:float, height:float, road_directions: list[RoadDirections], type: RoadType=RoadType.HORIZONTAL):
+        match (type):
+            case (RoadType.HORIZONTAL):
+                hr = HorizontalRaod(self.screen, x, y, width, height, road_directions)
+                self.spawn_road(hr)
+                return hr 
+
+            case (RoadType.VERTICAL):
+                vr = VerticalRoad(self.screen, x, y, width, height, road_directions)
+                self.spawn_road(vr)
+                return vr 
+
+            case (RoadType.INTERSECTION):
+                # A intersection should have the same number for width and height
+                if width != height:
+                    print(f"Error: The intersection has not got the same width: {width} and height: {height}.")
+                
+                it = Intersection(self.screen, x, y, width, road_directions)
+                self.spawn_road(it)
+                return it 
+                    
     def spawn_car(self, x: int = 300, y: int = 370) -> None:
         if len(self.cars) < 4:
             self.cars.append(Car(self.screen, x, y, RoadDirections.EAST))
@@ -165,15 +192,12 @@ class Game():
 
     def draw(self) -> None:
         self.screen.fill(Color.GRAY.value)
-        self.west_road.draw()
+
         self.west_traffic_light.draw()
-        self.east_road.draw()
-        self.south_road.draw()
-        self.north_road.draw()
-        self.intersection.draw()
         
-        for car in self.cars:
-            car.draw()
+        [road.draw() for road in self.roads]
+        
+        [car.draw() for car in self.cars]        
         
         self.remaining_time_text()
         pygame.display.flip()

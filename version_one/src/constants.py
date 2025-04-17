@@ -21,3 +21,8 @@ class RoadDirections(Enum):
     SOUTH = "down"
     WEST = "left"
 
+
+class RoadType(Enum):
+    HORIZONTAL = "horizontal"
+    VERTICAL = "vertical"
+    INTERSECTION = "intersection"

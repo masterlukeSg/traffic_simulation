@@ -10,11 +10,14 @@ class Road(ABC):
         self.screen = screen
         self.x: float = start_x
         self.y: float = start_y
-        self.length: int = lenght
-        self.width: int = width
+        self.length: float = lenght
+        self.width: float = width
         self.lanes_amount: int = lanes_amount
-        self.lane_width: int = LANE_WIDTH
-        self.directions: list[RoadDirections] = directions
+        self.lane_width: float = LANE_WIDTH
+        self._directions: list[RoadDirections] = directions
+
+    def draw_rect(self, color, x: float, y: float, width:float , height: float) -> None:
+        pygame.draw.rect(self.screen, color, pygame.Rect(x, y, width, height))
 
     def draw(self) -> None:
         pass
@@ -22,25 +25,33 @@ class Road(ABC):
     def create_seperator(self) -> None:
         pass
 
-    def get_directions(self) -> list[RoadDirections]:
-        return self.directions
-  
- 
+    @property
+    def directions(self) -> list[RoadDirections]:
+        return self._directions
+    
+    @property
+    def middle_x(self) -> int:
+        return self.x + (self.width // 2)
+    
+    @property
+    def middle_y(self) -> int:
+        return self.y + (self.width // 2) 
+
+
 class HorizontalRaod(Road):
     def __init__(self, screen, start_x, start_y, lenght, width, directions, lanes_amount=2):
         super().__init__(screen, start_x, start_y, lenght, width, directions, lanes_amount) 
-        self.lane_middle = self.y + (self.width // 2) # Only works for 2 lanes!
-    
-    def get_directions(self) -> list[RoadDirections]:
-        return super().get_directions()
     
     def draw(self) -> None:
+        black = Color.BLACK.value
+        white = Color.WHITE.value
+        
         # Road : Black lane
-        pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.x, self.y, self.length, self.lane_width))
-        pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.x, self.y+self.width, self.length, self.lane_width))
+        self.draw_rect(black, self.x, self.y, self.length, self.lane_width)
+        self.draw_rect(black, self.x, self.y+self.width, self.length, self.lane_width)
         
         # Innerroad : White space
-        pygame.draw.rect(self.screen, Color.WHITE.value, pygame.Rect(self.x, self.y+self.lane_width, self.length, self.width-self.lane_width))
+        self.draw_rect(white, self.x, self.y+self.lane_width, self.length, self.width-self.lane_width)
 
         # Road seperator : Black 
         self.create_seperator()
@@ -53,24 +64,23 @@ class HorizontalRaod(Road):
 
         # Middle y-position for the separator
         for i in range(self.x, self.x + self.length, separator_width + separator_gap):
-            pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(i, self.lane_middle, separator_width, separator_height))
+            pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(i, self.middle_y, separator_width, separator_height))
 
 
 class VerticalRoad(Road):
     def __init__(self, screen, start_x, start_y, lenght, width, directions, lanes_amount=2):
         super().__init__(screen, start_x, start_y, lenght, width, directions, lanes_amount)
-        self.lane_middle = self.x + (self.width // 2) # Only works for 2 lanes!
-        
-    def get_directions(self) -> list[RoadDirections]:
-        return super().get_directions()          
 
     def draw(self) -> None:
-        # Road : Black lane
-        pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.x, self.y+self.lane_width, self.lane_width, self.length))
-        pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.x+self.width, self.y+self.lane_width, self.lane_width, self.length))
+        black = Color.BLACK.value
+        white = Color.WHITE.value
         
+        # Road : Black lane
+        self.draw_rect(black, self.x, self.y+self.lane_width, self.lane_width, self.length)
+        self.draw_rect(black,self.x+self.width, self.y+self.lane_width, self.lane_width, self.length)
+                
         # Innerroad : White space
-        pygame.draw.rect(self.screen, Color.WHITE.value, pygame.Rect(self.x+self.lane_width, self.y+self.lane_width, self.width-self.lane_width, self.length))
+        self.draw_rect(white,self.x+self.lane_width, self.y+self.lane_width, self.width-self.lane_width, self.length)
 
         # Road seperator : Black 
         self.create_seperator()        
@@ -83,16 +93,23 @@ class VerticalRoad(Road):
 
         # Middle y-position for the separator
         for i in range(self.y+self.lane_width, self.y + self.length, separator_width + separator_gap):
-            pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.lane_middle, i,  separator_height, separator_width))
-        
+            pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.middle_x, i,  separator_height, separator_width))
+    
     
 class Intersection(Road):
     def __init__(self, screen, start_x, start_y, side_length, directions):
-        super().__init__(screen,start_x, start_y,side_length, side_length,directions)
-        self.side_length: int = side_length - self.lane_width 
-    
+        super().__init__(screen, start_x, start_y, side_length, side_length, directions)
+        
+        reduced_side = side_length - self.lane_width
+        
+        self.side_length = reduced_side
+        self.width = reduced_side
+        self.length = reduced_side  # falls du das auch benutzt
+
     def draw(self) -> None:
-        pygame.draw.rect(self.screen, Color.WHITE.value, pygame.Rect(self.x, self.y, self.side_length, self.side_length))
+        white = Color.WHITE.value
+        self.draw_rect(white,self.x, self.y, self.side_length, self.side_length)
+        
         self.create_boundries()
         self.draw_turn_markers()
     
@@ -132,14 +149,44 @@ class Intersection(Road):
         for cx, cy in corners:
             self.draw_corner_pixel(cx, cy, corner_size, corner_size)
     
-    def get_directions(self):
-        return super().get_directions()
-
     def draw_turn_markers(self) -> None:        
-        offset = LANE_WIDTH // 2
-        middle_x: int = ((self.side_length / 2) + self.x) - offset
-        middle_y: int = ((self.side_length / 2) + self.y) - offset  
-        pygame.draw.rect(self.screen, Color.BLACK.value,pygame.Rect(middle_x, middle_y, LANE_WIDTH, LANE_WIDTH))
+        black = Color.BLACK.value
+        
+    
+        # middle
+        self.draw_rect(black, self.middle_x, self.middle_y, LANE_WIDTH, LANE_WIDTH)
+        
+        # upper left & right
+        self.draw_rect(black, self.upper_left_middle[0], self.upper_left_middle[1], LANE_WIDTH, LANE_WIDTH)
+        self.draw_rect(black, self.upper_right_middle[0], self.upper_right_middle[1], LANE_WIDTH, LANE_WIDTH)
+        
+        # lower left & right
+        self.draw_rect(black, self.lower_left_middle[0], self.lower_left_middle[1], LANE_WIDTH, LANE_WIDTH)
+        self.draw_rect(black, self.lower_right_middle[0], self.lower_right_middle[1], LANE_WIDTH, LANE_WIDTH)
+
+    @property
+    def upper_left_middle(self):
+        return (((self.x + self.middle_x) // 2) -2, ((self.y + self.middle_y) // 2) - 2)
+    
+    @property 
+    def upper_right_middle(self):
+        return (((self.middle_x + (self.x + self.width)) // 2) - 2,((self.y + self.middle_y) // 2) - 2)
+    
+    @property
+    def lower_left_middle(self):
+        return (((self.x + self.middle_x) // 2) - 2, ((self.middle_y + (self.y + self.width)) // 2) - 2)
+    
+    @property
+    def lower_right_middle(self):
+       return (((self.middle_x + (self.x + self.width)) // 2) - 2, ((self.middle_y + (self.y + self.width)) // 2) - 2)
+    
+    @property
+    def middle_y(self) -> int: 
+        return self.y + (self.width // 2) -2
+
+    @property
+    def middle_x(self) -> int:
+        return self.x + (self.width // 2) -2
     
 
 class TrafficLight:
