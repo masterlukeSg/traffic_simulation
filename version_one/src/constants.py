@@ -20,3 +20,4 @@ class RoadDirections(Enum):
     EAST = "right"
     SOUTH = "down"
     WEST = "left"
+

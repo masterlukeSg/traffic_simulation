@@ -2,11 +2,11 @@ from __future__ import annotations # To type hint car in the car class
 import pygame
 import uuid
 from constants import Color, ColorPhase, RoadDirections
-from map import HorizontalRaod, VerticalRoad, TrafficLight, Intersection, LANE_WIDTH
+from map import Road, HorizontalRaod, VerticalRoad, TrafficLight, Intersection, LANE_WIDTH
 
 
 class Car:
-    def __init__(self, screen, x, y, color=Color.BLACK):
+    def __init__(self, screen, x, y, direction, color=Color.BLACK):
         self.screen = screen
         
         self.id = uuid.uuid4().hex[:6] # 6 chars for the id 
@@ -14,6 +14,7 @@ class Car:
         self.safety_distance = self.radius * 5
         self.speed = 60
         self.driving = False
+        self.direction = direction
         self.color = color.value
         
         self.x = x
@@ -49,7 +50,7 @@ class Car:
 
         return True
     
-    def apply_move(self, delta_time: int) -> None:
+    def apply_move(self, delta_time: int, next_direction: RoadDirections=RoadDirections.EAST) -> None:
         self.driving = True
         self.x += self.speed * delta_time
 
@@ -69,9 +70,6 @@ class Car:
         cars_in_front_of_me = all_cars[index+1:]
 
         return cars_in_front_of_me
-
-        # TODO: detect if a car is infront of me or am i the first car ?
-        # safty distance to the next car in front of me 
     
     def car_in_front_moving(self, car_in_front: list[Car]) -> bool:
         car = car_in_front[0]
@@ -93,8 +91,9 @@ class Game():
         self.my_font = pygame.font.SysFont('Freeroad', 20)
 
         self.cars: list[Car] = []
-        self.car_spawn_rate: int = 2 # every ... seconds a car should spawn
-        self.last_car_spawn_time: int = pygame.time.get_ticks() - self.car_spawn_rate * 1000.
+        self.roads: list[Road] = [] # TODO: Implement the list and add all roads to it. Give it to the car ojects
+        self.car_spawn_cooldown: int = 2
+        self.last_car_spawn_time: int = pygame.time.get_ticks() - self.car_spawn_cooldown * 1000.
 
     def play(self) -> None:
         self.generate_map()
@@ -116,7 +115,7 @@ class Game():
         
         
         self.west_road = HorizontalRaod(self.screen, road_x, road_y, road_length, road_width, road_directions)
-        self.west_traffic_light = TrafficLight(self.screen, end_street_x-10, road_y-10)
+        self.west_traffic_light = TrafficLight(self.screen, end_street_x-15, road_y-10)
         
         self.east_road = HorizontalRaod(self.screen, end_street_x+intersec_side_lengths-LANE_WIDTH, road_y, road_length, road_width, road_directions)
         
@@ -126,12 +125,13 @@ class Game():
         
         self.intersection = Intersection(self.screen, end_street_x, end_y, intersec_side_lengths, road_directions)
     
-    def spawn_car(self, x: int = 120, y: int = 220) -> None:
-        self.cars.append(Car(self.screen, x, y))
+    def spawn_car(self, x: int = 300, y: int = 370) -> None:
+        if len(self.cars) < 4:
+            self.cars.append(Car(self.screen, x, y, RoadDirections.EAST))
 
     def create_cars(self) -> None:
         current_time = pygame.time.get_ticks()
-        if (current_time - self.last_car_spawn_time) >= self.car_spawn_rate * 1000:
+        if (current_time - self.last_car_spawn_time) >= self.car_spawn_cooldown * 1000:
             self.spawn_car()
             self.last_car_spawn_time = current_time
                   

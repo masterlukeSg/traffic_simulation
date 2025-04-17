@@ -86,18 +86,15 @@ class VerticalRoad(Road):
             pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.lane_middle, i,  separator_height, separator_width))
         
     
-class Intersection():
+class Intersection(Road):
     def __init__(self, screen, start_x, start_y, side_length, directions):
-        self.screen = screen
-        self.x: int = start_x
-        self.y: int = start_y
-        self.side_length: int = side_length
-        self.directions: list[RoadDirections] = directions
-        self.lane_width = LANE_WIDTH
+        super().__init__(screen,start_x, start_y,side_length, side_length,directions)
+        self.side_length: int = side_length - self.lane_width 
     
     def draw(self) -> None:
-        pygame.draw.rect(self.screen, Color.WHITE.value, pygame.Rect(self.x, self.y, self.side_length-self.lane_width, self.side_length-self.lane_width))
+        pygame.draw.rect(self.screen, Color.WHITE.value, pygame.Rect(self.x, self.y, self.side_length, self.side_length))
         self.create_boundries()
+        self.draw_turn_markers()
     
     def draw_corner_pixel(self, x, y, w, h):
         pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(x, y, w, h))
@@ -105,23 +102,23 @@ class Intersection():
     def create_boundries(self) -> None:
         lane = self.lane_width
         size = self.side_length
-        max_x = self.x + size - lane
-        max_y = self.y + size - lane
+        max_x = self.x + size
+        max_y = self.y + size
         corner_size = LANE_WIDTH
 
 
         # Side boundaries
         if RoadDirections.EAST not in self.directions:
-            self.draw_corner_pixel(max_x, self.y, lane, size - lane)
+            self.draw_corner_pixel(max_x, self.y, lane, size)
 
         if RoadDirections.WEST not in self.directions:
-            self.draw_corner_pixel(self.x, self.y, lane, size - lane)
+            self.draw_corner_pixel(self.x, self.y, lane, size )
 
         if RoadDirections.NORTH not in self.directions:
-            self.draw_corner_pixel(self.x, self.y - lane, size - lane, lane)
+            self.draw_corner_pixel(self.x, self.y - lane, size , lane)
 
         if RoadDirections.SOUTH not in self.directions:
-            self.draw_corner_pixel(self.x, self.y - lane + size, size - lane, lane)
+            self.draw_corner_pixel(self.x, self.y+ size, size , lane)
 
 
         # Draw corners
@@ -134,7 +131,16 @@ class Intersection():
         
         for cx, cy in corners:
             self.draw_corner_pixel(cx, cy, corner_size, corner_size)
-            
+    
+    def get_directions(self):
+        return super().get_directions()
+
+    def draw_turn_markers(self) -> None:        
+        offset = LANE_WIDTH // 2
+        middle_x: int = ((self.side_length / 2) + self.x) - offset
+        middle_y: int = ((self.side_length / 2) + self.y) - offset  
+        pygame.draw.rect(self.screen, Color.BLACK.value,pygame.Rect(middle_x, middle_y, LANE_WIDTH, LANE_WIDTH))
+    
 
 class TrafficLight:
     def __init__(self, screen, x, y, color=ColorPhase.RED):
