@@ -3,98 +3,9 @@ import pygame
 import uuid
 from constants import Color, ColorPhase, RoadDirections, RoadType
 from map import Road, HorizontalRaod, VerticalRoad, TrafficLight, Intersection, LANE_WIDTH
+from verhicles import Car
 
-class Car:
-    def __init__(self, screen, x, y, direction):
-        self.screen = screen
-        
-        self.id = uuid.uuid4().hex[:6] # 6 chars for the id 
-        self.safety_distance = 40
-        self.speed = 60
-        self.driving = False
-        self.direction = direction
-        self.img = pygame.image.load('version_one/images/Car.png')
-        self.rotate = False
 
-        self.x = x
-        self.y = y
-      
-    def draw(self) -> None:
-        self.screen.blit(self.img,(self.x, self.y))
-    
-    def move(self, delta_time: int, traffic_light: TrafficLight, all_cars: list[Car], all_roads: list[Road]) -> None:
-        if self.should_move(traffic_light, all_cars):
-            self.apply_move(delta_time)
-            self.driving = True
-            
-        else:
-            self.driving = False
-            
-    def should_move(self, traffic_light: TrafficLight, all_cars: list[Car]) -> bool:
-        phase = traffic_light.get_phase()
-        traffic_light_x= traffic_light.get_location[0]
-        
-        car_front = self.x + self.safety_distance
-        wait_phases = [ColorPhase.RED.name, ColorPhase.YELLOW.name]
-
-        cars_in_front = self.get_cars_in_front(all_cars)
-        
-        if cars_in_front: 
-            if not self.car_in_front_moving(cars_in_front):
-                return False
-            
-        # Car is near the traffic light & must wait as it is yellow or red
-        if traffic_light_x - car_front <= 10 and traffic_light_x - car_front >= 1 and phase in wait_phases:    
-            return False
-
-        return True
-    
-    def apply_move(self, delta_time: int) -> None:
-        self.driving = True
-        
-        
-        # TODO: CHANGE with coordinates !!!! 
-        # TODO: self.rotate has to be done different.        
-        
-        if 569 <= self.x <= 573:            
-            self.y -= self.speed * delta_time
-            if not self.rotate:
-                #self.img = pygame.transform.rotate(self.img, 30)
-                #self.img = pygame.transform.rotate(self.img, 60)
-                self.img = pygame.transform.rotate(self.img, 90)
-                self.rotate = True
-
-            
-        else:
-            self.x += self.speed * delta_time
-         
-        # TODO: check which road he drives and then how he should drive
-       
-    # TODO: check if we need it
-    def position(self) -> tuple[int, int]:
-        return (self.x, self.y)
-   
-    def is_off_screen(self) -> bool:
-        return self.x > self.screen.get_width() or self.y > self.screen.get_height() or self.x < -10 or self.y < -10
-
-    def get_cars_in_front(self, all_cars: list[Car]) -> list[Car]:
-        all_cars_ids = [car.id for car in all_cars]
-        
-        index = all_cars_ids.index(self.id)
-        cars_in_front_of_me = all_cars[index+1:]
-
-        return cars_in_front_of_me
-    
-    def car_in_front_moving(self, car_in_front: list[Car]) -> bool:
-        car = car_in_front[0]
-        too_close = abs(car.x - self.x) < self.safety_distance
-        return car.driving_status or not too_close
-       
-    @property
-    def driving_status(self) -> bool:
-        return self.driving
-              
-        
 class Game():
     def __init__(self) -> None:
         pygame.init()
@@ -113,10 +24,11 @@ class Game():
 
     def play(self) -> None:
         self.generate_map()
+        
         self.game_loop()
     
     def generate_map(self) -> None:
-        # starting road is the west_road
+        # starting road is coming from the west
         road_x = 300 
         road_y = 350
         road_length = 220
@@ -136,19 +48,25 @@ class Game():
         self.create_road(end_street_x-LANE_WIDTH, road_y+intersec_side_lengths-LANE_WIDTH, road_length, road_width, road_directions, RoadType.VERTICAL)
         self.create_road(end_street_x-LANE_WIDTH, road_y-road_length, road_length, road_width, road_directions, RoadType.VERTICAL)
         self.create_road(end_street_x, end_y, intersec_side_lengths, intersec_side_lengths, road_directions, RoadType.INTERSECTION)
-
+        
+        self.sync_intersects_with_roads()
+     
+    def sync_intersects_with_roads(self) -> None:
+        for road in self.roads:
+            road.find_connected_roads(self.roads)
+           
     def spawn_road(self, road: Road) -> None:
         self.roads.append(road)
     
     def create_road(self, x:float, y:float, width:float, height:float, road_directions: list[RoadDirections], type: RoadType=RoadType.HORIZONTAL):
         match (type):
             case (RoadType.HORIZONTAL):
-                hr = HorizontalRaod(self.screen, x, y, width, height, road_directions)
+                hr = HorizontalRaod(self.screen,RoadType.HORIZONTAL, x, y, width, height, road_directions)
                 self.spawn_road(hr)
                 return hr 
 
             case (RoadType.VERTICAL):
-                vr = VerticalRoad(self.screen, x, y, width, height, road_directions)
+                vr = VerticalRoad(self.screen, RoadType.VERTICAL, x, y, width, height, road_directions)
                 self.spawn_road(vr)
                 return vr 
 
@@ -157,7 +75,7 @@ class Game():
                 if width != height:
                     print(f"Error: The intersection has not got the same width: {width} and height: {height}.")
                 
-                it = Intersection(self.screen, x, y, width, road_directions)
+                it = Intersection(self.screen, RoadType.INTERSECTION, x, y, width, road_directions)
                 self.spawn_road(it)
                 return it 
                     
@@ -176,14 +94,7 @@ class Game():
         current = pygame.time.get_ticks()
         delta = (current - prev_time) / 1000.0  # Consistent car movement regardless of frame rate
         return delta, current
-    
-    def remaining_time_text(self) -> None:
-        time_left = str(self.west_traffic_light.remaining_time())
-        next_pahse = self.west_traffic_light.get_next_phase().title()
-        combined = f'In {time_left} seconds the traffic light will change to {next_pahse}'
-        self.text1 = self.my_font.render(combined, True, Color.BLACK.value)
-        self.screen.blit(self.text1,(10, 10))
-    
+       
     def handle_events(self) -> None:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -208,7 +119,6 @@ class Game():
         
         [car.draw() for car in self.cars]        
         
-        #self.remaining_time_text()
         pygame.display.flip()
         
     def game_loop(self) -> None:
