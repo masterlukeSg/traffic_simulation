@@ -4,26 +4,25 @@ import uuid
 from constants import Color, ColorPhase, RoadDirections, RoadType
 from map import Road, HorizontalRaod, VerticalRoad, TrafficLight, Intersection, LANE_WIDTH
 
-
 class Car:
-    def __init__(self, screen, x, y, direction, color=Color.BLACK):
+    def __init__(self, screen, x, y, direction):
         self.screen = screen
         
         self.id = uuid.uuid4().hex[:6] # 6 chars for the id 
-        self.radius = 4.5
-        self.safety_distance = self.radius * 5
+        self.safety_distance = 40
         self.speed = 60
         self.driving = False
         self.direction = direction
-        self.color = color.value
-        
+        self.img = pygame.image.load('version_one/images/Car.png')
+        self.rotate = False
+
         self.x = x
         self.y = y
       
     def draw(self) -> None:
-        pygame.draw.circle(self.screen, self.color, [self.x, self.y], self.radius)
+        self.screen.blit(self.img,(self.x, self.y))
     
-    def move(self, delta_time: int, traffic_light: TrafficLight, all_cars: list[Car]) -> None:
+    def move(self, delta_time: int, traffic_light: TrafficLight, all_cars: list[Car], all_roads: list[Road]) -> None:
         if self.should_move(traffic_light, all_cars):
             self.apply_move(delta_time)
             self.driving = True
@@ -33,7 +32,7 @@ class Car:
             
     def should_move(self, traffic_light: TrafficLight, all_cars: list[Car]) -> bool:
         phase = traffic_light.get_phase()
-        traffic_light_x= traffic_light.get_location()[0]
+        traffic_light_x= traffic_light.get_location[0]
         
         car_front = self.x + self.safety_distance
         wait_phases = [ColorPhase.RED.name, ColorPhase.YELLOW.name]
@@ -53,18 +52,30 @@ class Car:
     def apply_move(self, delta_time: int) -> None:
         self.driving = True
         
-        # TODO: check which road he drives and then how he should drive
-        if self.x:
-            self.y += self.speed * delta_time
+        
+        # TODO: CHANGE with coordinates !!!! 
+        # TODO: self.rotate has to be done different.        
+        
+        if 569 <= self.x <= 573:            
+            self.y -= self.speed * delta_time
+            if not self.rotate:
+                #self.img = pygame.transform.rotate(self.img, 30)
+                #self.img = pygame.transform.rotate(self.img, 60)
+                self.img = pygame.transform.rotate(self.img, 90)
+                self.rotate = True
+
+            
         else:
             self.x += self.speed * delta_time
-
+         
+        # TODO: check which road he drives and then how he should drive
+       
     # TODO: check if we need it
     def position(self) -> tuple[int, int]:
         return (self.x, self.y)
    
     def is_off_screen(self) -> bool:
-        return self.x > self.screen.get_width() or self.y > self.screen.get_height()
+        return self.x > self.screen.get_width() or self.y > self.screen.get_height() or self.x < -10 or self.y < -10
 
     def get_cars_in_front(self, all_cars: list[Car]) -> list[Car]:
         all_cars_ids = [car.id for car in all_cars]
@@ -95,8 +106,6 @@ class Game():
         
         self.clock = pygame.time.Clock()
         self.prev_time = pygame.time.get_ticks()
-        self.my_font = pygame.font.SysFont('Freeroad', 20)
-
         self.cars: list[Car] = []
         self.roads: list[Road] = [] # TODO: Implement the list and add all roads to it. Give it to the car ojects
         self.car_spawn_cooldown: int = 2
@@ -120,7 +129,7 @@ class Game():
         
         road_directions = [RoadDirections.WEST, RoadDirections.SOUTH, RoadDirections.NORTH, RoadDirections.EAST]
         
-        self.west_traffic_light = TrafficLight(self.screen, end_street_x-15, road_y-10)
+        self.west_traffic_light = TrafficLight(self.screen, end_street_x-30, road_y+90)
         
         self.create_road(road_x, road_y, road_length, road_width, road_directions, RoadType.HORIZONTAL)
         self.create_road(end_street_x+intersec_side_lengths-LANE_WIDTH, road_y, road_length, road_width, road_directions, RoadType.HORIZONTAL)
@@ -152,9 +161,10 @@ class Game():
                 self.spawn_road(it)
                 return it 
                     
-    def spawn_car(self, x: int = 300, y: int = 370) -> None:
+    def spawn_car(self, x: int = 300, y: int = 405) -> None:
         if len(self.cars) < 4:
-            self.cars.append(Car(self.screen, x, y, RoadDirections.EAST))
+            self.cars.append(Car(self.screen, x, y, RoadDirections.EAST))       
+            self.cars.sort(key=lambda car: car.x) # sort the cars after x value
 
     def create_cars(self) -> None:
         current_time = pygame.time.get_ticks()
@@ -185,10 +195,9 @@ class Game():
         self.create_cars()
        
         self.cars = [car for car in self.cars if not car.is_off_screen()] # delete cras, which are not in the screen
-        self.cars.sort(key=lambda car: car.x) # sort the cars after x value
  
         for car in self.cars:
-            car.move(self.delta_time, self.west_traffic_light, self.cars)
+            car.move(self.delta_time, self.west_traffic_light, self.cars ,self.roads)
 
     def draw(self) -> None:
         self.screen.fill(Color.GRAY.value)
@@ -199,7 +208,7 @@ class Game():
         
         [car.draw() for car in self.cars]        
         
-        self.remaining_time_text()
+        #self.remaining_time_text()
         pygame.display.flip()
         
     def game_loop(self) -> None:

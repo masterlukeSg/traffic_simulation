@@ -151,7 +151,6 @@ class Intersection(Road):
     
     def draw_turn_markers(self) -> None:        
         black = Color.BLACK.value
-        
     
         # middle
         self.draw_rect(black, self.middle_x, self.middle_y, LANE_WIDTH, LANE_WIDTH)
@@ -163,7 +162,7 @@ class Intersection(Road):
         # lower left & right
         self.draw_rect(black, self.lower_left_middle[0], self.lower_left_middle[1], LANE_WIDTH, LANE_WIDTH)
         self.draw_rect(black, self.lower_right_middle[0], self.lower_right_middle[1], LANE_WIDTH, LANE_WIDTH)
-
+        
     @property
     def upper_left_middle(self):
         return (((self.x + self.middle_x) // 2) -2, ((self.y + self.middle_y) // 2) - 2)
@@ -192,25 +191,37 @@ class Intersection(Road):
 class TrafficLight:
     def __init__(self, screen, x, y, color=ColorPhase.RED):
         self.screen = screen
-        self.width = 10
-        self.heihgt = 10
         self.x = x
         self.y = y
         self.color_phase = color
         self.starting_color_phase = color
-
+        
         # how long a phase should take (in seconds)
-        self.green_red_phase = randint (5,9)
+        self.green_red_phase = randint (4,9)
         self.yellow_phase = 2
               
         self.countdown_start: int = self.green_red_phase
         self.start_ticks = pygame.time.get_ticks()
         self.time_left = self.countdown_start
-            
+        
+        self.my_font = pygame.font.SysFont('Freeroad', 20)
+        self.img_green, self.img_red, self.img_yellow = None, None, None  
+        self.set_img()
+    
     def draw(self) -> None:
         self.update_phase()
-        pygame.draw.rect(self.screen, self.color_phase.value, pygame.Rect(self.x, self.y, self.width, self.heihgt))
-    
+        self.remaining_time_text()
+        
+        match (self.color_phase.value):
+            case (ColorPhase.GREEN.value):
+                self.screen.blit(self.img_green,(self.x, self.y))
+            
+            case (ColorPhase.YELLOW.value):
+                self.screen.blit(self.img_yellow,(self.x, self.y))
+            
+            case (ColorPhase.RED.value):
+                self.screen.blit(self.img_red,(self.x, self.y))
+        
     def update_phase(self) -> None:
         # Calculate how many full seconds have passed since the traffic light was created
         self.seconds_passed = (pygame.time.get_ticks() - self.start_ticks) // 1000
@@ -261,6 +272,25 @@ class TrafficLight:
         # first dict and then go into second dict
         return transition.get(start, {}).get(phase, {})
     
+    def remaining_time_text(self) -> None:
+        time_left = str(self.remaining_time)
+        
+        self.text1 = self.my_font.render(time_left, True, Color.BLACK.value)
+        self.screen.blit(self.text1,(self.x + 5, self.y+60))
+    
+    def set_img(self) -> None:
+        scale = (20, 56)
+        
+        self.img_green = self.load_img('version_one/images/GreenTrafficLight.png', scale)
+        self.img_yellow = self.load_img('version_one/images/YellowTrafficLight.png', scale)
+        self.img_red = self.load_img('version_one/images/RedTrafficLight.png', scale)
+    
+    def load_img(self, url: str, scale: tuple[int,int]) -> pygame.image:
+        img = pygame.image.load(url)
+        img = pygame.transform.scale(img, scale)
+        return img
+    
+    @property
     def remaining_time(self) -> int:
         red = ColorPhase.RED.name
         green = ColorPhase.GREEN.name
@@ -272,6 +302,7 @@ class TrafficLight:
         else:        
             return int(self.time_left)
     
+    @property  
     def get_location(self) -> tuple[int, int]:
         return (self.x, self.y) 
      
