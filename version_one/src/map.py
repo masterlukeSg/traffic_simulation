@@ -1,20 +1,23 @@
-from __future__ import annotations # To type hint car in the car class
+from __future__ import annotations
 import pygame
+import uuid
 from abc import ABC
-from constants import Color, ColorPhase, RoadDirections, LANE_WIDTH
+from constants import Color, ColorPhase, RoadDirections, RoadType, LANE_WIDTH
 from random import randint
 
 
 class Road(ABC):
-    def __init__(self, screen, start_x, start_y, lenght, width, directions: list[RoadDirections], lanes_amount=2):
+    def __init__(self, screen, road_type: RoadType, start_x: float, start_y: float, lenght: float, width:float, directions: list[RoadDirections]):
         self.screen = screen
         self.x: float = start_x
         self.y: float = start_y
         self.length: float = lenght
         self.width: float = width
-        self.lanes_amount: int = lanes_amount
+        self.lanes_amount: int = 2
         self.lane_width: float = LANE_WIDTH
         self._directions: list[RoadDirections] = directions
+        self.id = uuid.uuid4().hex[:6] # 6 chars for the id
+        self.road_type:RoadType = road_type
 
     def draw_rect(self, color, x: float, y: float, width:float , height: float) -> None:
         pygame.draw.rect(self.screen, color, pygame.Rect(x, y, width, height))
@@ -25,6 +28,57 @@ class Road(ABC):
     def create_seperator(self) -> None:
         pass
 
+    def street_end(self, direction: RoadDirections.value) -> tuple[int, int]:
+        match (direction):
+            case (RoadDirections.SOUTH.value):
+                return (self.x, self.y + self.length)
+            
+            case(RoadDirections.NORTH.value):
+                return (self.x, self.y + self.lane_width)
+            
+            case (RoadDirections.EAST.value):
+                return (self.x+self.length-self.lane_width, self.y)
+            
+            case(RoadDirections.WEST.value):
+                return (self.x, self.y)
+            
+            case (_):
+                print("This direction is not compatible with the road")
+                return None
+    
+    def find_connected_roads(self, roads: list[Road]) -> dict | None:
+        if self.road_type != RoadType.INTERSECTION:
+            return None
+        
+        self.connected_roads = {}
+
+        margin = 5
+        
+        for road in roads:
+            if road.id == self.id:
+                continue
+
+
+            # Check NORTH: road ends at top of intersection
+            if abs(road.y + road.length - self.y) <= margin and road.x < self.x + self.width and road.x + road.width > self.x:
+                self.connected_roads[RoadDirections.NORTH] = road
+
+            # Check SOUTH: road starts at bottom of intersection
+            elif abs(road.y - (self.y + self.length)) <= margin and road.x < self.x + self.width and road.x + road.width > self.x:
+                self.connected_roads[RoadDirections.SOUTH] = road
+
+            # Check WEST: road ends at left of intersection
+            elif abs(road.x + road.length - self.x) <= margin and road.y < self.y + self.length and road.y + road.length > self.y:
+                self.connected_roads[RoadDirections.WEST] = road
+
+            # Check EAST: road starts at right of intersection
+            elif abs(road.x - (self.x + self.width)) <= margin and road.y < self.y + self.length and road.y + road.length > self.y:
+                self.connected_roads[RoadDirections.EAST] = road
+            
+        
+        return self.connected_roads 
+    
+    
     @property
     def directions(self) -> list[RoadDirections]:
         return self._directions
@@ -39,8 +93,8 @@ class Road(ABC):
 
 
 class HorizontalRaod(Road):
-    def __init__(self, screen, start_x, start_y, lenght, width, directions, lanes_amount=2):
-        super().__init__(screen, start_x, start_y, lenght, width, directions, lanes_amount) 
+    def __init__(self, screen, road_type: RoadType, start_x: float, start_y: float, lenght: float, width: float, directions: list[RoadDirections]):
+        super().__init__(screen, road_type, start_x, start_y, lenght, width, directions) 
     
     def draw(self) -> None:
         black = Color.BLACK.value
@@ -66,10 +120,15 @@ class HorizontalRaod(Road):
         for i in range(self.x, self.x + self.length, separator_width + separator_gap):
             pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(i, self.middle_y, separator_width, separator_height))
 
-
+    def street_end(self, direction: RoadDirections.value) -> tuple[int, int] | None:
+        if direction is RoadDirections.NORTH.value or direction is RoadDirections.SOUTH.value:
+            direction = None
+        
+        return super().street_end(direction)
+        
 class VerticalRoad(Road):
-    def __init__(self, screen, start_x, start_y, lenght, width, directions, lanes_amount=2):
-        super().__init__(screen, start_x, start_y, lenght, width, directions, lanes_amount)
+    def __init__(self, screen, road_type: RoadType, start_x, start_y, lenght, width, directions):
+        super().__init__(screen,road_type, start_x, start_y, lenght, width, directions)
 
     def draw(self) -> None:
         black = Color.BLACK.value
@@ -81,7 +140,7 @@ class VerticalRoad(Road):
                 
         # Innerroad : White space
         self.draw_rect(white,self.x+self.lane_width, self.y+self.lane_width, self.width-self.lane_width, self.length)
-
+        
         # Road seperator : Black 
         self.create_seperator()        
 
@@ -95,10 +154,16 @@ class VerticalRoad(Road):
         for i in range(self.y+self.lane_width, self.y + self.length, separator_width + separator_gap):
             pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.middle_x, i,  separator_height, separator_width))
     
+    def street_end(self, direction: RoadDirections.value) -> tuple[int, int] | None:
+        if direction is RoadDirections.EAST.value or direction is RoadDirections.WEST.value:
+            direction = None
+        
+        return super().street_end(direction)
+   
     
 class Intersection(Road):
-    def __init__(self, screen, start_x, start_y, side_length, directions):
-        super().__init__(screen, start_x, start_y, side_length, side_length, directions)
+    def __init__(self, screen, road_type: RoadType, start_x: float, start_y: float, side_length: float, directions: list[RoadDirections]):
+        super().__init__(screen, road_type, start_x, start_y, side_length, side_length, directions)
         
         reduced_side = side_length - self.lane_width
         
@@ -149,7 +214,7 @@ class Intersection(Road):
         for cx, cy in corners:
             self.draw_corner_pixel(cx, cy, corner_size, corner_size)
     
-    def draw_turn_markers(self) -> None:        
+    def draw_turn_markers(self) -> None:
         black = Color.BLACK.value
     
         # middle
@@ -162,7 +227,8 @@ class Intersection(Road):
         # lower left & right
         self.draw_rect(black, self.lower_left_middle[0], self.lower_left_middle[1], LANE_WIDTH, LANE_WIDTH)
         self.draw_rect(black, self.lower_right_middle[0], self.lower_right_middle[1], LANE_WIDTH, LANE_WIDTH)
-        
+    
+    
     @property
     def upper_left_middle(self):
         return (((self.x + self.middle_x) // 2) -2, ((self.y + self.middle_y) // 2) - 2)
