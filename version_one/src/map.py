@@ -139,7 +139,8 @@ class HorizontalRaod(Road):
             direction = None
         
         return super().street_end(direction)
-        
+    
+    
 class VerticalRoad(Road):
     def __init__(self, screen, road_type: RoadType, start_x, start_y, lenght, width, directions):
         super().__init__(screen,road_type, start_x, start_y, lenght, width, directions)
@@ -242,7 +243,38 @@ class Intersection(Road):
         self.draw_rect(black, self.lower_left_middle[0], self.lower_left_middle[1], LANE_WIDTH, LANE_WIDTH)
         self.draw_rect(black, self.lower_right_middle[0], self.lower_right_middle[1], LANE_WIDTH, LANE_WIDTH)
     
+    def is_next_intersection(self, direction: RoadDirections, road: RoadType) -> bool:
+        # When there are turns possible then this intersection is the next intersection
+        if self.get_possible_turns(direction, road):
+            return True
+        
+        return False
     
+    def get_possible_turns(self, direction: RoadDirections, road: RoadType) -> dict[RoadDirections]:
+        translate_direction = { RoadDirections.NORTH: RoadDirections.SOUTH,
+                                RoadDirections.WEST: RoadDirections.EAST,
+                              }
+        
+        # switch the key with the value and it to the dict
+        translate_direction.update({value: key  for key, value in translate_direction.items()})
+        
+        new_direction = translate_direction.get(direction, None)
+            
+        if new_direction is None:
+            raise ValueError("The direction is not found")
+       
+        found_road = self.connected_roads.get(new_direction, None)
+
+        # When the found road is the given road we know the road and the intersection are connected
+        # Only return the key value pairs with out the own road and direction
+        if found_road == road:
+            non_self_roads = self.connected_roads.copy()
+            non_self_roads.pop(new_direction)
+            return non_self_roads
+        
+        else:
+            return None
+        
     @property
     def upper_left_middle(self):
         return (((self.x + self.middle_x) // 2) -2, ((self.y + self.middle_y) // 2) - 2)
@@ -266,8 +298,8 @@ class Intersection(Road):
     @property
     def middle_x(self) -> int:
         return self.x + (self.width // 2) -2
-    
-
+   
+ 
 class TrafficLight:
     def __init__(self, screen, x, y, color=ColorPhase.RED):
         self.screen = screen
