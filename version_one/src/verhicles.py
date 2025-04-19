@@ -22,7 +22,7 @@ class Car:
         self.safety_distance = 40
         self.speed = 60
         self.img = pygame.image.load('version_one/images/Car.png')
-        self.rotate = False
+        self.rotation = False
         
         self.driving = False
         self._driving_direction = direction
@@ -41,7 +41,7 @@ class Car:
         self.all_roads = all_roads
         
         if self.should_move(traffic_light, all_cars):
-            new_direction = self.moving_direction()
+            new_direction = self.get_next_direction()
             
             if new_direction is not None:
                 self.next_direction = new_direction
@@ -73,32 +73,93 @@ class Car:
     
     def apply_move(self, delta_time: int) -> None:
         self.driving = True
-        
-        # TODO: CHANGE with coordinates !!!! 
-        # TODO: self.rotate has to be done different. (better animation!!!)       
-        
-        # TODO: add other possibilities to drive and update the driving position        
-        #       self.x -= self.speed * delta_time 
-        #       self._driving_direction = RoadDirections.WEST
+        if not self.road_driving_on:
+            return
 
-        #       self.y += self.speed * delta_time 
-        #       self._driving_direction = RoadDirections.SOUTH
-        
-        if 569 <= self.x <= 573:            
-            self._driving_direction = RoadDirections.NORTH
-            self.y -= self.speed * delta_time
-            
-            if not self.rotate:
-                #self.img = pygame.transform.rotate(self.img, 30)
-                #self.img = pygame.transform.rotate(self.img, 60)
-                self.img = pygame.transform.rotate(self.img, 90)
-                self.rotate = True
-
+        if self.at_intersection():
+            self.handle_turning(delta_time)
         else:
-            self._driving_direction = RoadDirections.EAST
-            self.x += self.speed * delta_time
+            self.rotation = False
+            self.drive_straight(delta_time)    
+
+    def at_intersection(self) -> bool:
+        next_intersection = self.get_next_intersection()
+        if next_intersection and next_intersection.on_road(self.x, self.y):
+            return True
+        return False
+
+    def handle_turning(self, delta_time: int) -> None:
+        next_intersection = self.get_next_intersection()
+        if not next_intersection:
+            self.drive_straight(delta_time)
+            return
+
+        directions = {
+            RoadDirections.EAST: {
+                RoadDirections.NORTH: next_intersection.lower_right_middle,
+                RoadDirections.SOUTH: next_intersection.lower_left_middle,
+            },
+            RoadDirections.WEST: {
+                RoadDirections.NORTH: next_intersection.upper_right_middle,
+                RoadDirections.SOUTH: next_intersection.upper_left_middle,
+            },
+            RoadDirections.NORTH: {
+                RoadDirections.EAST: next_intersection.lower_right_middle,
+                RoadDirections.WEST: next_intersection.upper_right_middle,
+            },
+            RoadDirections.SOUTH: {
+                RoadDirections.EAST: next_intersection.lower_left_middle,
+                RoadDirections.WEST: next_intersection.upper_left_middle,
+            },
+        }
+
+        # Find turn coordinates
+        turn_coords = directions.get(self._driving_direction, {}).get(self.next_direction)
+
+        if turn_coords and self._is_at_coordinates(turn_coords):
+            self._driving_direction = self.next_direction
+            self.rotate_car(self.next_direction)
+            self.next_direction = None
+           
+
+        self.drive_straight(delta_time)
+
+    def rotate_car(self, direction: RoadDirections):
+        if self.rotation:
+            return None
+        match (direction.value):
+            case (RoadDirections.NORTH.value):
+                self.img = pygame.transform.rotate(self.img, 90)
+                self.rotation = True
+            
+            case (RoadDirections.SOUTH.value):
+                self.img = pygame.transform.rotate(self.img, -90)
+                self.rotation = True
+            
+            case (RoadDirections.WEST.value):
+                self.img = pygame.transform.rotate(self.img, 90)
+                self.rotation = True
+        
+            case (RoadDirections.EAST.value):
+                self.img = pygame.transform.rotate(self.img, -90)
+                self.rotation = True
+        
+    def drive_straight(self, delta_time: int) -> None:
+        match self._driving_direction:
+            case RoadDirections.NORTH:
+                self.y -= self.speed * delta_time
+            case RoadDirections.SOUTH:
+                self.y += self.speed * delta_time
+            case RoadDirections.WEST:
+                self.x -= self.speed * delta_time
+            case RoadDirections.EAST:
+                self.x += self.speed * delta_time
+
+    def _is_at_coordinates(self, coords: tuple[int, int], tolerance: int = 3) -> bool:
+        return (coords[0] - tolerance <= self.x <= coords[0] + tolerance and
+                coords[1] - tolerance <= self.y <= coords[1] + tolerance)
     
-    def moving_direction(self) -> RoadDirections | None:
+    def get_next_direction(self) -> RoadDirections | None:
         # The road i am driving on is a road which was already detected
         if not self.set_road_driving_on():
             return None
@@ -120,15 +181,17 @@ class Car:
     def set_road_driving_on(self) -> bool:
         for road in self.all_roads:
             # Car must be on road and road should not be a intersection     
-            if not road.on_road(self.x, self.y) or road._road_type is RoadType.INTERSECTION:
-                continue
-            # Update prev road driving variable
-            if self.prev_road_driving_on != road:
-                    self.prev_road_driving_on = self.road_driving_on
-                    self.road_driving_on = road
-                    return True # new road was detected
-            
-            return False # still on a detected road 
+            if road.on_road(self.x, self.y) and road._road_type is not RoadType.INTERSECTION:
+                # Update prev road driving variable
+                if self.prev_road_driving_on != road:
+                        self.prev_road_driving_on = self.road_driving_on
+                        self.road_driving_on = road
+                        
+                        return True # new road was detected
+                
+                return True # old road
+        
+        return False # still on a detected road 
     
     def get_next_intersection(self) -> Road | None:
         # get the intersection which comes next        
