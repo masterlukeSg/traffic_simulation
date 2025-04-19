@@ -77,16 +77,18 @@ class Road(ABC):
         return self.connected_roads 
     
     def on_road(self, x: float, y: float) -> bool:
+        in_x_range, in_y_range = 0,0
+        
         if isinstance(self, HorizontalRaod):
             in_x_range = self.x <= x <= self.x + self.length
             in_y_range = self.y <= y <= self.y + self.width
         elif isinstance(self, VerticalRoad):
             in_x_range = self.x <= x <= self.x + self.width
             in_y_range = self.y <= y <= self.y + self.length
-        else:
+        elif isinstance(self, Intersection):
             in_x_range = self.x <= x <= self.x + self.width
-            in_y_range = self.y <= y <= self.length
-            
+            in_y_range = self.y <= y <= self.y + self.width
+        
         return in_x_range and in_y_range
     
     @property
