@@ -24,7 +24,6 @@ class Game():
 
     def play(self) -> None:
         self.generate_map()
-        
         self.game_loop()
     
     def generate_map(self) -> None:
@@ -39,19 +38,29 @@ class Game():
         
         intersec_side_lengths = road_width # to compensate the seperators
         
-        road_directions = [RoadDirections.WEST, RoadDirections.SOUTH, RoadDirections.NORTH, RoadDirections.EAST]
+        road_directions_hor = [RoadDirections.WEST, RoadDirections.SOUTH]
+        road_directions_ver = [RoadDirections.NORTH, RoadDirections.EAST]
         
         self.west_traffic_light = TrafficLight(self.screen, end_street_x-30, road_y+90)
         
-        self.create_road(road_x, road_y, road_length, road_width, road_directions, RoadType.HORIZONTAL)
-        self.create_road(end_street_x+intersec_side_lengths-LANE_WIDTH, road_y, road_length, road_width, road_directions, RoadType.HORIZONTAL)
-        self.create_road(end_street_x-LANE_WIDTH, road_y+intersec_side_lengths-LANE_WIDTH, road_length, road_width, road_directions, RoadType.VERTICAL)
-        self.create_road(end_street_x-LANE_WIDTH, road_y-road_length, road_length, road_width, road_directions, RoadType.VERTICAL)
-        self.create_road(end_street_x, end_y, intersec_side_lengths, intersec_side_lengths, road_directions, RoadType.INTERSECTION)
+        #TODO: update the road_directions 
+        # For intersect maybe disable it as we can call it with sync_intersects_with_roads() -> will have to implement the code
+        
+        # TODO: The traffic ligth should be given to the road (delete from the car)
+        # then check which for which direction the traffig light is needed 
+        # the safety_distance for the car is then not the traffic light, but the end of the road (must be changed in the car class)
+        
+        self.create_road(road_x, road_y, road_length, road_width, road_directions_hor, RoadType.HORIZONTAL)
+        self.create_road(end_street_x+intersec_side_lengths-LANE_WIDTH, road_y, road_length, road_width, road_directions_hor, RoadType.HORIZONTAL)
+        self.create_road(end_street_x-LANE_WIDTH, road_y+intersec_side_lengths-LANE_WIDTH, road_length, road_width, road_directions_ver, RoadType.VERTICAL)
+        self.create_road(end_street_x-LANE_WIDTH, road_y-road_length, road_length, road_width, road_directions_ver, RoadType.VERTICAL)
+        self.create_road(end_street_x, end_y, intersec_side_lengths, intersec_side_lengths, road_directions_hor + road_directions_ver, RoadType.INTERSECTION)
         
         self.sync_intersects_with_roads()
+        
      
     def sync_intersects_with_roads(self) -> None:
+        # intersections will know which roads are connected with them
         for road in self.roads:
             road.find_connected_roads(self.roads)
            
