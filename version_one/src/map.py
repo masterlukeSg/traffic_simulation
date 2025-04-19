@@ -243,13 +243,6 @@ class Intersection(Road):
         self.draw_rect(black, self.lower_left_middle[0], self.lower_left_middle[1], LANE_WIDTH, LANE_WIDTH)
         self.draw_rect(black, self.lower_right_middle[0], self.lower_right_middle[1], LANE_WIDTH, LANE_WIDTH)
     
-    def is_next_intersection(self, direction: RoadDirections, road: RoadType) -> bool:
-        # When there are turns possible then this intersection is the next intersection
-        if self.get_possible_turns(direction, road):
-            return True
-        
-        return False
-    
     def get_possible_turns(self, direction: RoadDirections, road: RoadType) -> dict[RoadDirections]:
         translate_direction = { RoadDirections.NORTH: RoadDirections.SOUTH,
                                 RoadDirections.WEST: RoadDirections.EAST,
