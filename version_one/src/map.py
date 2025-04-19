@@ -17,7 +17,8 @@ class Road(ABC):
         self.lane_width: float = LANE_WIDTH
         self._directions: list[RoadDirections] = directions
         self.id = uuid.uuid4().hex[:6] # 6 chars for the id
-        self.road_type:RoadType = road_type
+        self._road_type:RoadType = road_type
+        self.connected_roads = {}
 
     def draw_rect(self, color, x: float, y: float, width:float , height: float) -> None:
         pygame.draw.rect(self.screen, color, pygame.Rect(x, y, width, height))
@@ -47,17 +48,14 @@ class Road(ABC):
                 return None
     
     def find_connected_roads(self, roads: list[Road]) -> dict | None:
-        if self.road_type != RoadType.INTERSECTION:
+        if self._road_type != RoadType.INTERSECTION:
             return None
         
-        self.connected_roads = {}
-
         margin = 5
         
         for road in roads:
             if road.id == self.id:
                 continue
-
 
             # Check NORTH: road ends at top of intersection
             if abs(road.y + road.length - self.y) <= margin and road.x < self.x + self.width and road.x + road.width > self.x:
@@ -78,6 +76,22 @@ class Road(ABC):
         
         return self.connected_roads 
     
+    def on_road(self, x: float, y: float) -> bool:
+        if isinstance(self, HorizontalRaod):
+            in_x_range = self.x <= x <= self.x + self.length
+            in_y_range = self.y <= y <= self.y + self.width
+        elif isinstance(self, VerticalRoad):
+            in_x_range = self.x <= x <= self.x + self.width
+            in_y_range = self.y <= y <= self.y + self.length
+        else:
+            in_x_range = self.x <= x <= self.x + self.width
+            in_y_range = self.y <= y <= self.length
+            
+        return in_x_range and in_y_range
+    
+    @property
+    def road_type(self) -> RoadType: 
+        return self._road_type
     
     @property
     def directions(self) -> list[RoadDirections]:
