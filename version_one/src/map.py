@@ -26,7 +26,7 @@ class Road(ABC):
     def draw(self) -> None:
         pass
     
-    def create_seperator(self) -> None:
+    def _create_seperator(self) -> None:
         pass
 
     def street_end(self, direction: RoadDirections.value) -> tuple[int, int]:
@@ -124,9 +124,9 @@ class HorizontalRaod(Road):
         self.draw_rect(white, self.x, self.y+self.lane_width, self.length, self.width-self.lane_width)
 
         # Road seperator : Black 
-        self.create_seperator()
+        self._create_seperator()
     
-    def create_seperator(self) -> None:
+    def _create_seperator(self) -> None:
         # Road separator (middle dashed line)
         separator_width = 10
         separator_height = 5
@@ -159,9 +159,9 @@ class VerticalRoad(Road):
         self.draw_rect(white,self.x+self.lane_width, self.y+self.lane_width, self.width-self.lane_width, self.length)
         
         # Road seperator : Black 
-        self.create_seperator()        
+        self._create_seperator()        
 
-    def create_seperator(self) -> None:
+    def _create_seperator(self) -> None:
         # Road separator (middle dashed line)
         separator_width = 10
         separator_height = 5
@@ -192,13 +192,13 @@ class Intersection(Road):
         white = Color.WHITE.value
         self.draw_rect(white,self.x, self.y, self.side_length, self.side_length)
         
-        self.create_boundries()
-        self.draw_turn_markers()
+        self.__create_boundries()
+        self.__draw_turn_markers()
     
-    def draw_corner_pixel(self, x, y, w, h):
+    def __draw_corner_pixel(self, x, y, w, h):
         pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(x, y, w, h))
     
-    def create_boundries(self) -> None:
+    def __create_boundries(self) -> None:
         lane = self.lane_width
         size = self.side_length
         max_x = self.x + size
@@ -208,16 +208,16 @@ class Intersection(Road):
 
         # Side boundaries
         if RoadDirections.EAST not in self.directions:
-            self.draw_corner_pixel(max_x, self.y, lane, size)
+            self.__draw_corner_pixel(max_x, self.y, lane, size)
 
         if RoadDirections.WEST not in self.directions:
-            self.draw_corner_pixel(self.x, self.y, lane, size )
+            self.__draw_corner_pixel(self.x, self.y, lane, size )
 
         if RoadDirections.NORTH not in self.directions:
-            self.draw_corner_pixel(self.x, self.y - lane, size , lane)
+            self.__draw_corner_pixel(self.x, self.y - lane, size , lane)
 
         if RoadDirections.SOUTH not in self.directions:
-            self.draw_corner_pixel(self.x, self.y+ size, size , lane)
+            self.__draw_corner_pixel(self.x, self.y+ size, size , lane)
 
 
         # Draw corners
@@ -229,9 +229,9 @@ class Intersection(Road):
         ]
         
         for cx, cy in corners:
-            self.draw_corner_pixel(cx, cy, corner_size, corner_size)
+            self.__draw_corner_pixel(cx, cy, corner_size, corner_size)
     
-    def draw_turn_markers(self) -> None:
+    def __draw_turn_markers(self) -> None:
         black = Color.BLACK.value
     
         # middle
@@ -313,11 +313,11 @@ class TrafficLight:
         
         self.my_font = pygame.font.SysFont('Freeroad', 20)
         self.img_green, self.img_red, self.img_yellow = None, None, None  
-        self.set_img()
+        self.__set_img()
     
     def draw(self) -> None:
-        self.update_phase()
-        self.remaining_time_text()
+        self.__update_phase()
+        self.__remaining_time_text()
         
         match (self.color_phase.value):
             case (ColorPhase.GREEN.value):
@@ -329,7 +329,7 @@ class TrafficLight:
             case (ColorPhase.RED.value):
                 self.screen.blit(self.img_red,(self.x, self.y))
         
-    def update_phase(self) -> None:
+    def __update_phase(self) -> None:
         # Calculate how many full seconds have passed since the traffic light was created
         self.seconds_passed = (pygame.time.get_ticks() - self.start_ticks) // 1000
         # Calculate how much time is left before the countdown ends (traffic light turns red or green)
@@ -360,39 +360,20 @@ class TrafficLight:
     def get_phase(self) -> str:
         return self.color_phase.name
 
-    def get_starting_phase(self) -> str:
-        return self.starting_color_phase.name
-
-    def get_next_phase(self) -> str:  
-        red = ColorPhase.RED.name
-        yellow = ColorPhase.YELLOW.name
-        green = ColorPhase.GREEN.name
-        
-        phase = self.get_phase()
-        start = self.get_starting_phase() 
-        
-        transition = {
-            red : {red: yellow , yellow: green},
-            green : {green: yellow, yellow: red},
-        }
-        
-        # first dict and then go into second dict
-        return transition.get(start, {}).get(phase, {})
-    
-    def remaining_time_text(self) -> None:
+    def __remaining_time_text(self) -> None:
         time_left = str(self.remaining_time)
         
         self.text1 = self.my_font.render(time_left, True, Color.BLACK.value)
         self.screen.blit(self.text1,(self.x + 5, self.y+60))
     
-    def set_img(self) -> None:
+    def __set_img(self) -> None:
         scale = (20, 56)
         
-        self.img_green = self.load_img('version_one/images/GreenTrafficLight.png', scale)
-        self.img_yellow = self.load_img('version_one/images/YellowTrafficLight.png', scale)
-        self.img_red = self.load_img('version_one/images/RedTrafficLight.png', scale)
+        self.img_green = self.__load_img('version_one/images/GreenTrafficLight.png', scale)
+        self.img_yellow = self.__load_img('version_one/images/YellowTrafficLight.png', scale)
+        self.img_red = self.__load_img('version_one/images/RedTrafficLight.png', scale)
     
-    def load_img(self, url: str, scale: tuple[int,int]) -> pygame.image:
+    def __load_img(self, url: str, scale: tuple[int,int]) -> pygame.image:
         img = pygame.image.load(url)
         img = pygame.transform.scale(img, scale)
         return img

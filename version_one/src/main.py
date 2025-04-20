@@ -1,7 +1,6 @@
 from __future__ import annotations # To type hint car in the car class
 import pygame
-import uuid
-from constants import Color, ColorPhase, RoadDirections, RoadType
+from constants import Color, RoadDirections, RoadType
 from map import Road, HorizontalRaod, VerticalRoad, TrafficLight, Intersection, LANE_WIDTH
 from verhicles import Car
 
