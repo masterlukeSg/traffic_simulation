@@ -18,7 +18,7 @@ class Game():
         self.clock = pygame.time.Clock()
         self.prev_time = pygame.time.get_ticks()
         self.cars: list[Car] = []
-        self.roads: list[Road] = [] # TODO: Implement the list and add all roads to it. Give it to the car ojects
+        self.roads: list[Road] = []
         self.car_spawn_cooldown: int = 2
         self.last_car_spawn_time: int = pygame.time.get_ticks() - self.car_spawn_cooldown * 1000.
 
