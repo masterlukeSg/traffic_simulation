@@ -24,7 +24,7 @@ class Car:
         
         img = pygame.image.load('version_one/images/Car.png')
 
-        self.ui_handler = CarUI(self.screen, img)
+        self.ui_handler = CarUI(self.screen, direction, img)
         self.logic = CarLogic(self.id, start_x, start_y, direction, self.ui_handler)
 
     def draw(self) -> None:
@@ -63,7 +63,7 @@ class CarLogic:
         
         self.rotation = False
         
-        
+            
         self.all_roads: list[Road] = None
         self.road_driving_on: Road = None
         self.prev_road_driving_on = self.road_driving_on
@@ -100,7 +100,7 @@ class CarLogic:
                 return False
             
         # Car is near the traffic light & must wait as it is yellow or red
-        if traffic_light_x - car_front <= 10 and traffic_light_x - car_front >= 1 and phase in wait_phases:    
+        if traffic_light_x - car_front <= 5 and traffic_light_x - car_front >= 1 and phase in wait_phases:    
             return False
 
         return True
@@ -183,7 +183,7 @@ class CarLogic:
         
         next_intersection = self.__get_next_intersection()
         if not next_intersection:
-            logging.info("Did not find a intersection")
+            #logging.info("Did not find a intersection")
             return None
 
         possible_turns_dict = next_intersection.get_possible_turns(self._driving_direction,  self.road_driving_on)
@@ -243,23 +243,41 @@ class CarLogic:
     
     
 class CarUI:
-    def __init__(self, screen, img):
+    def __init__(self, screen, start_rotation, img):
         self.screen = screen
         self.img = img
+        self.current_rotation = start_rotation
           
     def draw(self, x, y) -> None:
         self.screen.blit(self.img,(x, y))
     
-    def rotate_car(self, direction: RoadDirections):        
-        match (direction.value):
-            case (RoadDirections.NORTH.value):
-                self.img = pygame.transform.rotate(self.img, 90)
-            
-            case (RoadDirections.SOUTH.value):
-                self.img = pygame.transform.rotate(self.img, -90)
-            
-            case (RoadDirections.WEST.value):
-                self.img = pygame.transform.rotate(self.img, 90)
+    def rotate_car(self, rotate_to: RoadDirections):              
+        angle = {
+            RoadDirections.EAST: {
+                RoadDirections.NORTH: 90,
+                RoadDirections.SOUTH: 270,
+                RoadDirections.WEST: 180,
+            },
+            RoadDirections.NORTH: {
+                RoadDirections.EAST: 270,
+                RoadDirections.WEST: 90,
+                RoadDirections.SOUTH: 180,
+            },
+            RoadDirections.SOUTH: {
+                RoadDirections.EAST: 90,
+                RoadDirections.WEST: 270,
+                RoadDirections.NORTH: 180,
+            },
+            RoadDirections.WEST: {
+                RoadDirections.NORTH: 270,
+                RoadDirections.SOUTH: 90,
+                RoadDirections.EAST: 180,
+            }
+        }
+
+        rotation = angle.get(self.current_rotation, {}).get(rotate_to, {})
+        if not rotation:
+            logging.info("The calling function has a error, as this function should not be callen, when there is no turn")
         
-            case (RoadDirections.EAST.value):
-                self.img = pygame.transform.rotate(self.img, -90)
+        self.img = pygame.transform.rotate(self.img, rotation)
+        self.current_rotation = rotate_to
