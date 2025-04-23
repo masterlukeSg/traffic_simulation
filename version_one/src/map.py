@@ -108,11 +108,11 @@ class Road(ABC):
                 case(RoadDirections.EAST.value): # horizontal road
                     self._all_traffic_lights[RoadDirections.EAST]= TrafficLight(self.screen,  self.street_end(RoadDirections.EAST)[0] - 25  , self.street_end(RoadDirections.EAST)[1] + self.width + 15) # must be on the upper side
                     
-    def draw_traffic_lights(self) -> None:
+    def _draw_traffic_lights(self) -> None:
         for traf in self._active_traffic_lights.values():
             traf.draw()
     
-    def set_traffic_lights(self, new_traffic_lights) -> None:
+    def _set_traffic_lights(self, new_traffic_lights) -> None:
         self._active_traffic_lights.update(new_traffic_lights)
     
     @property
@@ -155,7 +155,7 @@ class HorizontalRaod(Road):
         # Road seperator : Black 
         self._create_seperator()
         
-        self.draw_traffic_lights()
+        self._draw_traffic_lights()
     
     def _create_seperator(self) -> None:
         # Road separator (middle dashed line)
@@ -193,7 +193,7 @@ class VerticalRoad(Road):
         # Road seperator : Black 
         self._create_seperator()        
         
-        self.draw_traffic_lights()
+        self._draw_traffic_lights()
 
     def _create_seperator(self) -> None:
         # Road separator (middle dashed line)
@@ -220,7 +220,9 @@ class Intersection(Road):
         
         self.side_length = reduced_side
         self.width = reduced_side
-        self.length = reduced_side        
+        self.length = reduced_side
+        
+        self.acitve_traffic_lights = {}
 
     def draw(self) -> None:
         white = Color.WHITE.value
@@ -289,13 +291,17 @@ class Intersection(Road):
         else:
             return None
     
-    def activate_needed_traffic_lights(self) -> None:
+    def acitvate_traffic_lights(self) -> None:
         translate_direction = { RoadDirections.NORTH: RoadDirections.SOUTH,
                                 RoadDirections.WEST: RoadDirections.EAST,
                               }
         
         # switch the key with the value and it to the dict
         translate_direction.update({value: key  for key, value in translate_direction.items()})
+        
+        # only when we have more then 2 roads a traffic light is needed
+        if len(self.connected_roads.items()) <= 2:
+            return 
         
         # for each connected road get the traffic lights and check if they are needed
         for road_direction, road in self.connected_roads.items(): 
@@ -308,7 +314,61 @@ class Intersection(Road):
                     new_traffic_lights[translated_road_direction] = traffic_light
 
             if new_traffic_lights:
-                road.set_traffic_lights(new_traffic_lights)
+                road._set_traffic_lights(new_traffic_lights)
+                for direction, traffic_light in new_traffic_lights.items():
+                    translated_road_direction = translate_direction.get(direction, None)
+                    self.acitve_traffic_lights[translated_road_direction] = traffic_light
+        
+        self.synchronise_traffic_lights()
+        
+    def synchronise_traffic_lights(self) -> None:
+        red_green_phase = randint(4,7)
+        yellow_phase = 2
+        
+        starting_phase_first_tf = ColorPhase.GREEN
+        starting_phase_other_tf = ColorPhase.RED
+        
+        countdown_start: int = red_green_phase
+        start_ticks = pygame.time.get_ticks()
+
+
+        hor = (self.acitve_traffic_lights.get(RoadDirections.WEST, False), self.acitve_traffic_lights.get(RoadDirections.EAST, False))
+        # calculate the amount of horizontal roads
+        if not hor[0] and not hor[1]: hor = 0
+        elif not hor[0] or not hor[1]: hor = 1
+        else: hor = 2
+        
+        ver = (self.acitve_traffic_lights.get(RoadDirections.SOUTH, False), self.acitve_traffic_lights.get(RoadDirections.NORTH, False))
+        # calculate the amount of vertical roads
+        if not ver[0] and not ver[1]: ver = 0
+        elif not ver[0] or not ver[1]: ver = 1
+        else: ver = 2
+
+        hor_dir = [RoadDirections.WEST, RoadDirections.EAST]
+        ver_dir = [RoadDirections.SOUTH, RoadDirections.NORTH]
+        
+        
+        for dir, tl in self.acitve_traffic_lights.items():
+            starting_phase = starting_phase_other_tf
+            
+            # who will start with the green phase
+            if hor == 2:
+                starting_dir = hor_dir
+            
+            elif ver == 2:
+                starting_dir = ver_dir
+            
+            elif hor == 0 or hor == 1:
+                starting_dir = ver_dir
+            
+            elif ver == 0 or ver == 1:
+                starting_dir = hor_dir
+                    
+                    
+            if dir in starting_dir:
+                starting_phase = starting_phase_first_tf
+            
+            tl.set_information(starting_phase, red_green_phase, yellow_phase, red_green_phase, countdown_start, start_ticks)
     
     @property
     def upper_left_middle(self):
@@ -336,25 +396,35 @@ class Intersection(Road):
    
  
 class TrafficLight:
-    def __init__(self, screen, x, y, color=ColorPhase.RED):
+    def __init__(self, screen, x, y):
         self.screen = screen
         self.x = x
         self.y = y
-        self.color_phase = color
-        self.starting_color_phase = color
+        self.color_phase: ColorPhase =  None
+        self.starting_color_phase: ColorPhase = None,
         
         # how long a phase should take (in seconds)
-        self.red_phase =  randint (4,8)
-        self.green_phase = randint(5,9)
-        self.yellow_phase = 2
-              
-        self.countdown_start: int = self.red_phase
-        self.start_ticks = pygame.time.get_ticks()
-        self.time_left = self.countdown_start
+        self.red_phase, self.yellow_phase, self.green_phase =  None, None, None
+
+        self.countdown_start: int = None
+        self.start_ticks = None
+        self.time_left = None
         
         self.my_font = pygame.font.SysFont('Freeroad', 20)
         self.img_green, self.img_red, self.img_yellow = None, None, None  
         self.__set_img()
+    
+    def set_information(self, starting_phase: ColorPhase, red_phase: ColorPhase, yellow_phase: ColorPhase, green_phase:ColorPhase, countdown_start: int, start_tick: int) -> None:
+        self.starting_color_phase = starting_phase
+        self.color_phase = starting_phase
+        
+        self.red_phase =  red_phase
+        self.yellow_phase = yellow_phase
+        self.green_phase = green_phase
+              
+        self.countdown_start: int = countdown_start
+        self.start_ticks: int = start_tick
+        self.time_left: int= countdown_start
     
     def draw(self) -> None:
         self.__update_phase()

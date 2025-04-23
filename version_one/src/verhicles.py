@@ -34,11 +34,10 @@ class Car:
     def move(self, delta_time: int, all_cars: list[Car], all_roads: list[Road]) -> None:
         self.logic.move(delta_time, all_cars, all_roads)
     
-    def is_off_screen(self) -> bool:
+    def deleteable(self) -> bool:
         self.__update_coordinates()
         return self.x > self.screen.get_width() or self.y > self.screen.get_height() or self.x < -10 or self.y < -10
-        return self.driving
-
+    
     def __update_coordinates(self):
         self.x, self.y = self.logic.coordinates
     
@@ -65,10 +64,7 @@ class CarLogic:
             
         self.all_roads: list[Road] = None
         self.road_driving_on: Road = None
-        self.prev_road_driving_on = self.road_driving_on
-
-    def is_off_screen(self) -> bool:
-        return self.x > self.screen.get_width() or self.y > self.screen.get_height() or self.x < -10 or self.y < -10
+        self.prev_road_driving_on = None
 
     def move(self, delta_time: int, all_cars: list[Car], all_roads: list[Road]) -> None:
         self.all_roads = all_roads

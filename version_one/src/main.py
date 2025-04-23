@@ -10,8 +10,8 @@ class Game():
         pygame.init()
         pygame.display.set_caption("Traffic simulation")
 
-        self.SCREEN_WIDTH = 1200
-        self.SCREEN_HEIGHT = 900
+        self.SCREEN_WIDTH = 1600
+        self.SCREEN_HEIGHT = 1000
         self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
         
         self.clock = pygame.time.Clock()
@@ -37,8 +37,8 @@ class Game():
         
         intersec_side_lengths = road_width # to compensate the seperators
         
-        road_directions_hor = [RoadDirections.WEST, RoadDirections.SOUTH]
-        road_directions_ver = [RoadDirections.NORTH, RoadDirections.EAST]
+        road_directions_hor = [RoadDirections.WEST, RoadDirections.EAST]
+        road_directions_ver = [RoadDirections.NORTH, RoadDirections.SOUTH]
         
         self.west_traffic_light = TrafficLight(self.screen, end_street_x-30, road_y+90)
         
@@ -65,7 +65,7 @@ class Game():
         
         for intersect in self.roads:
             if intersect.road_type is RoadType.INTERSECTION:
-                intersect.update_traffic_lights()
+                intersect.acitvate_traffic_lights()
          
     def spawn_road(self, road: Road) -> None:
         self.roads.append(road)
@@ -117,7 +117,7 @@ class Game():
         self.delta_time, self.prev_time = self.update_time(self.prev_time)
         self.create_cars()
        
-        self.cars = [car for car in self.cars if not car.is_off_screen()] # delete cars, which are not in the screen
+        self.cars = [car for car in self.cars if not car.deleteable()] # delete cars, which are not in the screen
  
         for car in self.cars:
             car.move(self.delta_time, self.cars ,self.roads)
