@@ -62,7 +62,11 @@ class Game():
         # intersections will know which roads are connected with them
         for road in self.roads:
             road.find_connected_roads(self.roads)
-           
+        
+        for intersect in self.roads:
+            if intersect.road_type is RoadType.INTERSECTION:
+                intersect.update_traffic_lights()
+         
     def spawn_road(self, road: Road) -> None:
         self.roads.append(road)
     
@@ -113,15 +117,13 @@ class Game():
         self.delta_time, self.prev_time = self.update_time(self.prev_time)
         self.create_cars()
        
-        self.cars = [car for car in self.cars if not car.is_off_screen()] # delete cras, which are not in the screen
+        self.cars = [car for car in self.cars if not car.is_off_screen()] # delete cars, which are not in the screen
  
         for car in self.cars:
-            car.move(self.delta_time, self.west_traffic_light, self.cars ,self.roads)
+            car.move(self.delta_time, self.cars ,self.roads)
 
     def draw(self) -> None:
         self.screen.fill(Color.GRAY.value)
-
-        self.west_traffic_light.draw()
         
         [road.draw() for road in self.roads]
         

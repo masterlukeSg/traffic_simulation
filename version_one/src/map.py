@@ -19,7 +19,8 @@ class Road(ABC):
         self.id = uuid.uuid4().hex[:6] # 6 chars for the id
         self._road_type:RoadType = road_type
         self.connected_roads = {}
-        self.traffic_lights = {}
+        self._all_traffic_lights = {}
+        self._active_traffic_lights = {}
 
     def draw_rect(self, color, x: float, y: float, width:float , height: float) -> None:
         pygame.draw.rect(self.screen, color, pygame.Rect(x, y, width, height))
@@ -96,21 +97,28 @@ class Road(ABC):
         for direction in self.directions:
             match(direction.value):
                 case(RoadDirections.NORTH.value): # vertical road
-                    self.traffic_lights[RoadDirections.NORTH] = TrafficLight(self.screen, self.street_end(RoadDirections.NORTH)[0] + self.width + 10, self.y + 20) # must be on the right side
+                    self._all_traffic_lights[RoadDirections.NORTH] = TrafficLight(self.screen, self.street_end(RoadDirections.NORTH)[0] + self.width + 10, self.y + 20) # must be on the right side
                 
                 case(RoadDirections.SOUTH.value): # vertical road
-                    self.traffic_lights[RoadDirections.SOUTH]= TrafficLight(self.screen, self.x - 25, self.street_end(RoadDirections.SOUTH)[1] - self.width + 5) # must be on the left side
+                    self._all_traffic_lights[RoadDirections.SOUTH]= TrafficLight(self.screen, self.x - 25, self.street_end(RoadDirections.SOUTH)[1] - self.width + 5) # must be on the left side
 
                 case(RoadDirections.WEST.value): # horizontal road
-                    self.traffic_lights[RoadDirections.WEST] = TrafficLight(self.screen, self.x + 10 , self.y - self.width + 5) # must be on the upper side
+                    self._all_traffic_lights[RoadDirections.WEST] = TrafficLight(self.screen, self.x + 10 , self.y - self.width + 5) # must be on the upper side
                 
                 case(RoadDirections.EAST.value): # horizontal road
-                    self.traffic_lights[RoadDirections.EAST]= TrafficLight(self.screen,  self.street_end(RoadDirections.EAST)[0] - 25  , self.street_end(RoadDirections.EAST)[1] + self.width + 15) # must be on the upper side
+                    self._all_traffic_lights[RoadDirections.EAST]= TrafficLight(self.screen,  self.street_end(RoadDirections.EAST)[0] - 25  , self.street_end(RoadDirections.EAST)[1] + self.width + 15) # must be on the upper side
                     
     def draw_traffic_lights(self) -> None:
-        for traf in self.traffic_lights.values():
+        for traf in self._active_traffic_lights.values():
             traf.draw()
-        
+    
+    def set_traffic_lights(self, new_traffic_lights) -> None:
+        self._active_traffic_lights.update(new_traffic_lights)
+    
+    @property
+    def traffic_light(self) -> dict:
+        return self._active_traffic_lights
+    
     @property
     def road_type(self) -> RoadType: 
         return self._road_type
@@ -212,7 +220,7 @@ class Intersection(Road):
         
         self.side_length = reduced_side
         self.width = reduced_side
-        self.length = reduced_side
+        self.length = reduced_side        
 
     def draw(self) -> None:
         white = Color.WHITE.value
@@ -280,7 +288,28 @@ class Intersection(Road):
         
         else:
             return None
+    
+    def activate_needed_traffic_lights(self) -> None:
+        translate_direction = { RoadDirections.NORTH: RoadDirections.SOUTH,
+                                RoadDirections.WEST: RoadDirections.EAST,
+                              }
+        
+        # switch the key with the value and it to the dict
+        translate_direction.update({value: key  for key, value in translate_direction.items()})
+        
+        # for each connected road get the traffic lights and check if they are needed
+        for road_direction, road in self.connected_roads.items(): 
+            new_traffic_lights = {}
+            
+            for traffic_light_direction, traffic_light in road._all_traffic_lights.items():
+                translated_road_direction = translate_direction.get(road_direction, None)
                 
+                if translated_road_direction == traffic_light_direction:
+                    new_traffic_lights[translated_road_direction] = traffic_light
+
+            if new_traffic_lights:
+                road.set_traffic_lights(new_traffic_lights)
+    
     @property
     def upper_left_middle(self):
         return (((self.x + self.middle_x) // 2) -2, ((self.y + self.middle_y) // 2) - 2)
