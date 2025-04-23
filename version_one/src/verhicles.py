@@ -31,8 +31,8 @@ class Car:
         self.__update_coordinates()
         self.ui_handler.draw(self.x, self.y)
     
-    def move(self, delta_time: int, traffic_light: TrafficLight, all_cars: list[Car], all_roads: list[Road]) -> None:
-        self.logic.move(delta_time, traffic_light, all_cars, all_roads)
+    def move(self, delta_time: int, all_cars: list[Car], all_roads: list[Road]) -> None:
+        self.logic.move(delta_time, all_cars, all_roads)
     
     def is_off_screen(self) -> bool:
         self.__update_coordinates()
@@ -55,14 +55,13 @@ class CarLogic:
         self.x = start_x
         self.y = start_y        
         
-        self.safety_distance = 40
+        self.safety_distance = 30
         self.speed = 60
         self.driving = False
         self._driving_direction = direction
         self.next_direction: RoadDirections = None
         
         self.rotation = False
-        
             
         self.all_roads: list[Road] = None
         self.road_driving_on: Road = None
@@ -71,12 +70,13 @@ class CarLogic:
     def is_off_screen(self) -> bool:
         return self.x > self.screen.get_width() or self.y > self.screen.get_height() or self.x < -10 or self.y < -10
 
-    def move(self, delta_time: int, traffic_light: TrafficLight, all_cars: list[Car], all_roads: list[Road]) -> None:
+    def move(self, delta_time: int, all_cars: list[Car], all_roads: list[Road]) -> None:
         self.all_roads = all_roads
+        self.__set_road_driving_on() # needs the all_roads var
         
-        if self.__should_move(traffic_light, all_cars):
+        if self.__should_move(all_cars):
             new_direction = self.__get_next_direction()
-            
+
             if new_direction is not None:
                 self.next_direction = new_direction
             
@@ -86,25 +86,44 @@ class CarLogic:
         else:
             self.driving = False
     
-    def __should_move(self, traffic_light: TrafficLight, all_cars: list[Car]) -> bool:
-        phase = traffic_light.get_phase()
-        traffic_light_x= traffic_light.get_location[0]
-        
-        car_front = self.x + self.safety_distance
-        wait_phases = [ColorPhase.RED.name, ColorPhase.YELLOW.name]
-
+    def __should_move(self, all_cars: list[Car]) -> bool:
         cars_in_front = self.__get_cars_in_front(all_cars)
-        
         if cars_in_front: 
             if not self.__car_in_front_moving(cars_in_front):
                 return False
+        
+        
+        wait_phases = [ColorPhase.RED.name, ColorPhase.YELLOW.name]
+        road = self.road_driving_on
+        
+        
+        if road and road.road_type is not RoadType.INTERSECTION: # An intersection has no traffic light
+            traffic_lights = road.traffic_light # Get the traffic light in both directions
+            traffic_light = traffic_lights.get(self._driving_direction, {}) # The traffic light for our direction
             
-        # Car is near the traffic light & must wait as it is yellow or red
-        if traffic_light_x - car_front <= 5 and traffic_light_x - car_front >= 1 and phase in wait_phases:    
-            return False
-
+            if traffic_light:
+                phase = traffic_light.get_phase()
+            
+                if traffic_light:    
+                    match(self._driving_direction): # Determine the coordinates where the road ends in our driving direction, along with the corresponding car position
+                        case (RoadDirections.EAST):
+                            car_front = self.x + self.safety_distance
+                            street_end = road.street_end(RoadDirections.EAST)[0] 
+                        case (RoadDirections.WEST):
+                            car_front = self.x - self.safety_distance
+                            street_end = road.x
+                        case(RoadDirections.NORTH):
+                            car_front = self.y - self.safety_distance
+                            street_end = road.y
+                        case(RoadDirections.SOUTH):
+                            car_front = self.y + self.safety_distance
+                            street_end = road.street_end(RoadDirections.SOUTH)[1] 
+                        
+                    if street_end - car_front <= 5 and street_end - car_front >= 1 and phase in wait_phases:
+                        return False
+                    
         return True
-    
+           
     def __apply_move(self, delta_time: int) -> None:
         self.driving = True
         if not self.road_driving_on:
