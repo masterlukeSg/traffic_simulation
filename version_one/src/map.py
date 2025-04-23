@@ -19,6 +19,7 @@ class Road(ABC):
         self.id = uuid.uuid4().hex[:6] # 6 chars for the id
         self._road_type:RoadType = road_type
         self.connected_roads = {}
+        self.traffic_lights = {}
 
     def draw_rect(self, color, x: float, y: float, width:float , height: float) -> None:
         pygame.draw.rect(self.screen, color, pygame.Rect(x, y, width, height))
@@ -29,8 +30,8 @@ class Road(ABC):
     def _create_seperator(self) -> None:
         pass
 
-    def street_end(self, direction: RoadDirections.value) -> tuple[int, int]:
-        match (direction):
+    def street_end(self, direction: RoadDirections) -> tuple[int, int]:
+        match (direction.value):
             case (RoadDirections.SOUTH.value):
                 return (self.x, self.y + self.length)
             
@@ -91,6 +92,25 @@ class Road(ABC):
         
         return in_x_range and in_y_range
     
+    def _create_traffic_ligts(self) -> None:
+        for direction in self.directions:
+            match(direction.value):
+                case(RoadDirections.NORTH.value): # vertical road
+                    self.traffic_lights[RoadDirections.NORTH] = TrafficLight(self.screen, self.street_end(RoadDirections.NORTH)[0] + self.width + 10, self.y + 20) # must be on the right side
+                
+                case(RoadDirections.SOUTH.value): # vertical road
+                    self.traffic_lights[RoadDirections.SOUTH]= TrafficLight(self.screen, self.x - 25, self.street_end(RoadDirections.SOUTH)[1] - self.width + 5) # must be on the left side
+
+                case(RoadDirections.WEST.value): # horizontal road
+                    self.traffic_lights[RoadDirections.WEST] = TrafficLight(self.screen, self.x + 10 , self.y - self.width + 5) # must be on the upper side
+                
+                case(RoadDirections.EAST.value): # horizontal road
+                    self.traffic_lights[RoadDirections.EAST]= TrafficLight(self.screen,  self.street_end(RoadDirections.EAST)[0] - 25  , self.street_end(RoadDirections.EAST)[1] + self.width + 15) # must be on the upper side
+                    
+    def draw_traffic_lights(self) -> None:
+        for traf in self.traffic_lights.values():
+            traf.draw()
+        
     @property
     def road_type(self) -> RoadType: 
         return self._road_type
@@ -111,6 +131,7 @@ class Road(ABC):
 class HorizontalRaod(Road):
     def __init__(self, screen, road_type: RoadType, start_x: float, start_y: float, lenght: float, width: float, directions: list[RoadDirections]):
         super().__init__(screen, road_type, start_x, start_y, lenght, width, directions) 
+        super()._create_traffic_ligts()
     
     def draw(self) -> None:
         black = Color.BLACK.value
@@ -125,6 +146,8 @@ class HorizontalRaod(Road):
 
         # Road seperator : Black 
         self._create_seperator()
+        
+        self.draw_traffic_lights()
     
     def _create_seperator(self) -> None:
         # Road separator (middle dashed line)
@@ -136,7 +159,7 @@ class HorizontalRaod(Road):
         for i in range(self.x, self.x + self.length, separator_width + separator_gap):
             pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(i, self.middle_y, separator_width, separator_height))
 
-    def street_end(self, direction: RoadDirections.value) -> tuple[int, int] | None:
+    def street_end(self, direction: RoadDirections) -> tuple[int, int] | None:
         if direction is RoadDirections.NORTH.value or direction is RoadDirections.SOUTH.value:
             direction = None
         
@@ -146,6 +169,7 @@ class HorizontalRaod(Road):
 class VerticalRoad(Road):
     def __init__(self, screen, road_type: RoadType, start_x, start_y, lenght, width, directions):
         super().__init__(screen,road_type, start_x, start_y, lenght, width, directions)
+        super()._create_traffic_ligts()
 
     def draw(self) -> None:
         black = Color.BLACK.value
@@ -160,6 +184,8 @@ class VerticalRoad(Road):
         
         # Road seperator : Black 
         self._create_seperator()        
+        
+        self.draw_traffic_lights()
 
     def _create_seperator(self) -> None:
         # Road separator (middle dashed line)
@@ -171,7 +197,7 @@ class VerticalRoad(Road):
         for i in range(self.y+self.lane_width, self.y + self.length, separator_width + separator_gap):
             pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(self.middle_x, i,  separator_height, separator_width))
     
-    def street_end(self, direction: RoadDirections.value) -> tuple[int, int] | None:
+    def street_end(self, direction: RoadDirections) -> tuple[int, int] | None:
         if direction is RoadDirections.EAST.value or direction is RoadDirections.WEST.value:
             direction = None
         
@@ -186,15 +212,14 @@ class Intersection(Road):
         
         self.side_length = reduced_side
         self.width = reduced_side
-        self.length = reduced_side  # falls du das auch benutzt
+        self.length = reduced_side
 
     def draw(self) -> None:
         white = Color.WHITE.value
         self.draw_rect(white,self.x, self.y, self.side_length, self.side_length)
         
         self.__create_boundries()
-        self.__draw_turn_markers()
-    
+        
     def __draw_corner_pixel(self, x, y, w, h):
         pygame.draw.rect(self.screen, Color.BLACK.value, pygame.Rect(x, y, w, h))
     
@@ -231,20 +256,6 @@ class Intersection(Road):
         for cx, cy in corners:
             self.__draw_corner_pixel(cx, cy, corner_size, corner_size)
     
-    def __draw_turn_markers(self) -> None:
-        black = Color.BLACK.value
-    
-        # middle
-        self.draw_rect(black, self.middle_x, self.middle_y, LANE_WIDTH, LANE_WIDTH)
-        
-        # upper left & right
-        self.draw_rect(black, self.upper_left_middle[0], self.upper_left_middle[1], LANE_WIDTH, LANE_WIDTH)
-        self.draw_rect(black, self.upper_right_middle[0], self.upper_right_middle[1], LANE_WIDTH, LANE_WIDTH)
-        
-        # lower left & right
-        self.draw_rect(black, self.lower_left_middle[0], self.lower_left_middle[1], LANE_WIDTH, LANE_WIDTH)
-        self.draw_rect(black, self.lower_right_middle[0], self.lower_right_middle[1], LANE_WIDTH, LANE_WIDTH)
-    
     def get_possible_turns(self, direction: RoadDirections, road: RoadType) -> dict[RoadDirections]:
         translate_direction = { RoadDirections.NORTH: RoadDirections.SOUTH,
                                 RoadDirections.WEST: RoadDirections.EAST,
@@ -269,7 +280,7 @@ class Intersection(Road):
         
         else:
             return None
-        
+                
     @property
     def upper_left_middle(self):
         return (((self.x + self.middle_x) // 2) -2, ((self.y + self.middle_y) // 2) - 2)
@@ -304,10 +315,11 @@ class TrafficLight:
         self.starting_color_phase = color
         
         # how long a phase should take (in seconds)
-        self.green_red_phase = randint (4,9)
+        self.red_phase =  randint (4,8)
+        self.green_phase = randint(5,9)
         self.yellow_phase = 2
               
-        self.countdown_start: int = self.green_red_phase
+        self.countdown_start: int = self.red_phase
         self.start_ticks = pygame.time.get_ticks()
         self.time_left = self.countdown_start
         
@@ -348,13 +360,13 @@ class TrafficLight:
             if self.starting_color_phase == ColorPhase.RED:
                 self.color_phase = ColorPhase.GREEN
                 self.starting_color_phase = ColorPhase.GREEN
+                self.countdown_start: int = self.green_phase # restart the countdown for the timer
                 
             elif self.starting_color_phase == ColorPhase.GREEN:
                 self.color_phase = ColorPhase.RED
                 self.starting_color_phase = ColorPhase.RED
+                self.countdown_start: int = self.red_phase # restart the countdown for the timer
             
-            # restart the countdown for the timer
-            self.countdown_start: int = self.green_red_phase
             self.start_ticks = pygame.time.get_ticks()
             
     def get_phase(self) -> str:
