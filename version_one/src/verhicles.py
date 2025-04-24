@@ -1,7 +1,7 @@
 from __future__ import annotations # To type hint car in the car class
 import pygame
 from constants import  ColorPhase, RoadDirections, RoadType
-from map import Road, TrafficLight
+from map import Road
 import logging
 from random import randint
 
@@ -55,7 +55,7 @@ class CarLogic:
         self.x = start_x
         self.y = start_y        
         
-        self.safety_distance = 30
+        self.safety_distance = 60
         self.speed = 60
         self.driving = False
         self._driving_direction = direction
@@ -93,6 +93,7 @@ class CarLogic:
         wait_phases = [ColorPhase.RED.name, ColorPhase.YELLOW.name]
         road = self.road_driving_on
         
+        road_safety_distance = 30
         
         if road and road.road_type is not RoadType.INTERSECTION: # An intersection has no traffic light
             traffic_lights = road.traffic_light # Get the traffic light in both directions
@@ -104,18 +105,18 @@ class CarLogic:
                 if traffic_light:    
                     match(self._driving_direction): # Determine the coordinates where the road ends in our driving direction, along with the corresponding car position
                         case (RoadDirections.EAST):
-                            car_front = self.x + self.safety_distance
+                            car_front = self.x + road_safety_distance
                             street_end = road.street_end(RoadDirections.EAST)[0] 
                         case (RoadDirections.WEST):
-                            car_front = self.x - self.safety_distance
+                            car_front = self.x - road_safety_distance / 2
                             street_end = road.x
                         case(RoadDirections.NORTH):
-                            car_front = self.y - self.safety_distance
+                            car_front = self.y - road_safety_distance / 2
                             street_end = road.y
                         case(RoadDirections.SOUTH):
-                            car_front = self.y + self.safety_distance
+                            car_front = self.y + road_safety_distance
                             street_end = road.street_end(RoadDirections.SOUTH)[1] 
-                        
+                    
                     if street_end - car_front <= 5 and street_end - car_front >= 1 and phase in wait_phases:
                         return False
                     
@@ -235,18 +236,47 @@ class CarLogic:
         return None
 
     def __get_cars_in_front(self, all_cars: list[Car]) -> list[Car]:
-        # TODO: only sorts after the x value. Should be sorted after x and y value (maybe check on which road i am and which car is also on the road)
-        all_cars_ids = [car.id for car in all_cars]
-        
-        index = all_cars_ids.index(self.id)
-        cars_in_front_of_me = all_cars[index+1:]
+        cars_in_front = []
 
-        return cars_in_front_of_me
-    
+        for car in all_cars:
+            if car.id == self.id:
+                continue
+
+            # Check whether the car is traveling on the same road and in the same direction
+            same_road = car.logic.road_driving_on == self.road_driving_on
+            same_direction = car.logic._driving_direction == self._driving_direction
+
+            if same_road and same_direction:
+                # Check whether it is actually in front of the current car
+                match self._driving_direction:
+                    case RoadDirections.EAST:
+                        if car.x > self.x:
+                            cars_in_front.append(car)
+                    case RoadDirections.WEST:
+                        if car.x < self.x:
+                            cars_in_front.append(car)
+                    case RoadDirections.NORTH:
+                        if car.y < self.y:
+                            cars_in_front.append(car)
+                    case RoadDirections.SOUTH:
+                        if car.y > self.y:
+                            cars_in_front.append(car)
+
+        # Sort by distance to the current car
+        if self._driving_direction in (RoadDirections.EAST, RoadDirections.WEST):
+            cars_in_front.sort(key=lambda c: abs(c.x - self.x))
+        else:
+            cars_in_front.sort(key=lambda c: abs(c.y - self.y))
+
+        return cars_in_front
+        
     def __car_in_front_moving(self, car_in_front: list[Car]) -> bool:
-        # TODO: to_close should also be for y value, if on a NORTH or SOUTH road
         car = car_in_front[0]
-        too_close = abs(car.x - self.x) < self.safety_distance
+        if self.road_driving_on.road_type is RoadType.HORIZONTAL:
+            too_close = abs(car.x - self.x) < self.safety_distance
+        else:
+            too_close = abs(car.y - self.y) < self.safety_distance  
+        
         return car.driving_status or not too_close
        
     @property
