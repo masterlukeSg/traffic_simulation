@@ -26,6 +26,7 @@ class Car:
 
         self.ui_handler = CarUI(self.screen, direction, img)
         self.logic = CarLogic(self.id, start_x, start_y, direction, self.ui_handler)
+        self.ui_handler.first_rotation(direction) 
 
     def draw(self) -> None:
         self.__update_coordinates()
@@ -265,6 +266,14 @@ class CarUI:
           
     def draw(self, x, y) -> None:
         self.screen.blit(self.img,(x, y))
+    
+    def first_rotation(self, rotate_to: RoadDirections):
+        angle = {   RoadDirections.EAST.value: 0,
+                    RoadDirections.NORTH.value: 90,
+                    RoadDirections.SOUTH.value: 270,
+                    RoadDirections.WEST.value: 180
+                }
+        self.img = pygame.transform.rotate(self.img, angle.get(rotate_to.value, 0))
     
     def rotate_car(self, rotate_to: RoadDirections):              
         angle = {
